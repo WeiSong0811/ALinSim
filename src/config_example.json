@@ -1,0 +1,8 @@
+{
+  "random_state": 42,
+  "initial_method": "random",
+  "strategy": "RandomSearch",
+  "dataset": "uci-concrete",
+  "n_pro_query": 10,
+  "threshold": 0.85
+}
