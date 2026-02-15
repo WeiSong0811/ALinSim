@@ -49,7 +49,7 @@ EMBEDDED_CONFIG: Dict[str, Any] = {
     # search-space mode
     "search_space_json": "data/search_space.json",
     "labeled_csv": "data/seed_10_samples.csv",
-    "search_rounds": 20,
+    "search_rounds": 2,
 
     # shared run settings
     "random_state": 42,
