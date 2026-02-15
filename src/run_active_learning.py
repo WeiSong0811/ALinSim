@@ -198,18 +198,17 @@ class ActiveLearningBenchmark:
             # Run active learning
             test_methods = ["normal"]  # Can be made configurable
 
-            query_idx_all, query_time_all, metrics_all = active_learning(
+            query_idx_all, query_time_all = active_learning(
                 [selected_estimator], X_t, y_t, X_val, y_val,
                 n_initial, self.n_pro_query, n_queries, self.threshold,
                 initial_method=self.initial_method,
                 test_methods=test_methods,
-                random_state=self.random_state,
-                record_metrics=True
+                random_state=self.random_state
             )
 
             # Save results
             self._save_results(
-                query_idx_all, query_time_all, metrics_all,
+                query_idx_all, query_time_all,
                 dataset_name, selected_estimator
             )
 
@@ -219,7 +218,7 @@ class ActiveLearningBenchmark:
             logger.error(f"Benchmark failed: {e}")
             raise
 
-    def _save_results(self, query_idx_all: Dict, query_time_all: Dict, metrics_all: Dict,
+    def _save_results(self, query_idx_all: Dict, query_time_all: Dict,
                      dataset_name: str, estimator: object) -> None:
         """Save benchmark results to JSON files."""
         current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -231,8 +230,7 @@ class ActiveLearningBenchmark:
             'initial_method': self.initial_method,
             'random_state': self.random_state,
             'strategy_name': estimator.__class__.__name__,
-            'timestamp': current_time,
-            'metrics': metrics_all
+            'timestamp': current_time
         })
 
         result_time_record = query_time_all.copy()

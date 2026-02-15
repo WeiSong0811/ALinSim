@@ -32,9 +32,10 @@ import numpy as np
 import pandas as pd
 import torch
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C, WhiteKernel
+from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 
-from utils import data_process_meta, active_learning
+from utils import data_process_meta, active_learning, suggest_next_batch
 from strategies import (
     TreeBasedRegressor_Diversity, TreeBasedRegressor_Representativity, GaussianProcessBased,
     QueryByCommittee, Basic_RD_ALR, GSBAG, QDD, RandomSearch, GSi, LearningLoss, BMDAL,
@@ -307,6 +308,12 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--mode", type=str, default="benchmark",
+        choices=["benchmark", "suggest"],
+        help="benchmark: run full offline AL with known labels; suggest: query next batch from partial labels only"
+    )
+
+    parser.add_argument(
         "--random-state", type=int, required=True,
         help="Random state for reproducibility"
     )
@@ -324,7 +331,7 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--dataset", type=str, required=True,
+        "--dataset", type=str,
         help="Name of the dataset (case-insensitive, e.g., 'uci-concrete')"
     )
 
@@ -343,6 +350,31 @@ def parse_arguments() -> argparse.Namespace:
         help="Path to JSON configuration file (keys: dataset, strategy, random_state, initial_method, n_pro_query, threshold)"
     )
 
+    parser.add_argument(
+        "--labeled-csv", type=str,
+        help="Path to labeled CSV (required in suggest mode)"
+    )
+
+    parser.add_argument(
+        "--unlabeled-csv", type=str,
+        help="Path to unlabeled/pool CSV with features only (required in suggest mode)"
+    )
+
+    parser.add_argument(
+        "--target-column", type=str,
+        help="Target column name in labeled CSV (required in suggest mode)"
+    )
+
+    parser.add_argument(
+        "--feature-columns", type=str,
+        help="Comma-separated feature names; default is all columns except target-column"
+    )
+
+    parser.add_argument(
+        "--output-dir", type=str, default=os.path.join("..", "result", "suggest"),
+        help="Output directory for suggest mode"
+    )
+
     return parser.parse_args()
 
 
@@ -356,9 +388,123 @@ def load_config_file(config_path: str) -> Dict[str, Any]:
         raise
 
 
+def run_partial_label_suggestion(args: argparse.Namespace) -> None:
+    """
+    Suggest the next batch to label using only:
+    - a small labeled set (features + target)
+    - a large unlabeled pool (features only)
+    """
+    required = {
+        "labeled_csv": args.labeled_csv,
+        "unlabeled_csv": args.unlabeled_csv,
+        "target_column": args.target_column,
+        "strategy": args.strategy,
+    }
+    missing = [k for k, v in required.items() if not v]
+    if missing:
+        raise ValueError(f"Missing required arguments for suggest mode: {', '.join(missing)}")
+
+    labeled_df = pd.read_csv(args.labeled_csv)
+    unlabeled_df = pd.read_csv(args.unlabeled_csv)
+
+    if args.target_column not in labeled_df.columns:
+        raise ValueError(f"Target column '{args.target_column}' not found in labeled CSV.")
+
+    if args.feature_columns:
+        feature_columns = [c.strip() for c in args.feature_columns.split(",") if c.strip()]
+    else:
+        feature_columns = [c for c in labeled_df.columns if c != args.target_column]
+
+    missing_in_labeled = [c for c in feature_columns if c not in labeled_df.columns]
+    missing_in_unlabeled = [c for c in feature_columns if c not in unlabeled_df.columns]
+    if missing_in_labeled:
+        raise ValueError(f"Feature columns missing in labeled CSV: {missing_in_labeled}")
+    if missing_in_unlabeled:
+        raise ValueError(f"Feature columns missing in unlabeled CSV: {missing_in_unlabeled}")
+
+    labeled_clean = labeled_df.dropna(subset=feature_columns + [args.target_column]).copy()
+    unlabeled_clean = unlabeled_df.dropna(subset=feature_columns).copy()
+    if labeled_clean.empty:
+        raise ValueError("No valid labeled rows remain after dropping NA values.")
+    if unlabeled_clean.empty:
+        raise ValueError("No valid unlabeled rows remain after dropping NA values.")
+
+    X_labeled_raw = labeled_clean[feature_columns]
+    y_labeled = labeled_clean[[args.target_column]]
+    X_unlabeled_raw = unlabeled_clean[feature_columns]
+
+    # Keep scaling consistent with existing project behavior.
+    scaler = StandardScaler()
+    scaler.fit(pd.concat([X_labeled_raw, X_unlabeled_raw], axis=0))
+    X_labeled = pd.DataFrame(
+        scaler.transform(X_labeled_raw), columns=feature_columns, index=labeled_clean.index
+    )
+    X_unlabeled = pd.DataFrame(
+        scaler.transform(X_unlabeled_raw), columns=feature_columns, index=unlabeled_clean.index
+    )
+
+    config = {
+        "random_state": args.random_state,
+        "initial_method": args.initial_method,
+        "strategy": args.strategy,
+        "dataset": args.dataset or "__partial__",
+        "n_pro_query": args.n_pro_query,
+        "threshold": args.threshold,
+    }
+    benchmark = ActiveLearningBenchmark(config)
+    strategy_registry = benchmark._create_strategy_registry()
+    selected_estimator = benchmark._resolve_strategy(strategy_registry)
+
+    query_idx = suggest_next_batch(
+        estimator=selected_estimator,
+        X_labeled=X_labeled,
+        y_labeled=y_labeled,
+        X_unlabeled=X_unlabeled,
+        n_pro_query=args.n_pro_query,
+        random_state=args.random_state,
+    )
+
+    current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    os.makedirs(args.output_dir, exist_ok=True)
+
+    selected_rows = unlabeled_clean.loc[query_idx].copy()
+    selected_rows_path = os.path.join(
+        args.output_dir,
+        f"to_label_{selected_estimator.__class__.__name__}_{current_time}.csv"
+    )
+    selected_rows.to_csv(selected_rows_path, index=True)
+
+    summary = {
+        "mode": "suggest",
+        "strategy_name": selected_estimator.__class__.__name__,
+        "random_state": args.random_state,
+        "n_pro_query": args.n_pro_query,
+        "target_column": args.target_column,
+        "feature_columns": feature_columns,
+        "selected_indices": [int(i) for i in query_idx],
+        "selected_rows_csv": selected_rows_path,
+        "timestamp": current_time,
+    }
+
+    summary_path = os.path.join(
+        args.output_dir,
+        f"suggest_summary_{selected_estimator.__class__.__name__}_{current_time}.json"
+    )
+    with open(summary_path, "w", encoding="utf-8") as f:
+        json.dump(summary, f, indent=2, ensure_ascii=False)
+
+    logger.info(f"Suggested {len(query_idx)} samples to label.")
+    logger.info(f"Selected rows saved to {selected_rows_path}")
+    logger.info(f"Summary saved to {summary_path}")
+
+
 def main():
     """Main entry point."""
     args = parse_arguments()
+
+    if args.mode == "suggest":
+        run_partial_label_suggestion(args)
+        return
 
     # Load configuration
     if args.config_file:
@@ -373,6 +519,8 @@ def main():
             'threshold': cfg.get('threshold', 0.85),
         }
     else:
+        if not args.dataset:
+            raise ValueError("--dataset is required in benchmark mode.")
         config = {
             'random_state': args.random_state,
             'initial_method': args.initial_method,

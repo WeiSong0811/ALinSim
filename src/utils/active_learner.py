@@ -171,4 +171,66 @@ def active_learning(estimators, X_t, y_t, X_val, y_val, n_initial, n_pro_query, 
             if record_metrics:
                 metrics_all[estimator.__class__.__name__] = metrics
 
-    return query_idx_all, query_time_all, metrics_all
+    if record_metrics:
+        return query_idx_all, query_time_all, metrics_all
+
+    return query_idx_all, query_time_all
+
+
+def suggest_next_batch(estimator, X_labeled, y_labeled, X_unlabeled, n_pro_query, random_state=36):
+    """
+    Suggest the next batch to label when pool labels are unavailable.
+
+    This function runs only one query step. It does not try to append newly
+    labeled data because labels are assumed to be provided later by an external
+    oracle/human.
+
+    Args:
+        estimator: Active learning strategy instance with ``query`` method.
+        X_labeled (pd.DataFrame): Labeled feature data.
+        y_labeled (pd.Series | pd.DataFrame): Labeled targets.
+        X_unlabeled (pd.DataFrame): Unlabeled feature pool.
+        n_pro_query (int): Number of samples to request in this round.
+        random_state (int, optional): Random seed for fallback random query.
+
+    Returns:
+        list[int]: Selected indices from ``X_unlabeled``.
+    """
+    if X_unlabeled.empty:
+        return []
+
+    n_act = min(int(n_pro_query), len(X_unlabeled))
+    if n_act <= 0:
+        return []
+
+    random_strategy = RandomSearch(random_state=random_state)
+
+    # Normalize target shape and create placeholder unlabeled targets so
+    # strategy signatures remain compatible in no-oracle mode.
+    if isinstance(y_labeled, pd.Series):
+        y_labeled_df = y_labeled.to_frame(name=y_labeled.name or "target")
+    else:
+        y_labeled_df = y_labeled
+
+    y_unlabeled_placeholder = pd.DataFrame(
+        np.nan, index=X_unlabeled.index, columns=y_labeled_df.columns
+    )
+
+    try:
+        query_idx = estimator.query(
+            X_unlabeled=X_unlabeled,
+            n_act=n_act,
+            X_labeled=X_labeled,
+            y_labeled=y_labeled_df,
+            y_unlabeled=y_unlabeled_placeholder
+        )
+    except Exception:
+        query_idx = random_strategy.query(
+            X_unlabeled=X_unlabeled,
+            n_act=n_act,
+            X_labeled=X_labeled,
+            y_labeled=y_labeled_df,
+            y_unlabeled=y_unlabeled_placeholder
+        )
+
+    return [int(i) for i in query_idx]
