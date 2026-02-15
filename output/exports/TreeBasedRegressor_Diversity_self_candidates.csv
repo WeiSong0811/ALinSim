@@ -1,0 +1,11 @@
+method,PS:PAN ratio,Feed rate(mL/h),Distance(cm),Mass fraction of solute,Mass fraction of SiO2 in solute,Applied voltage(kV),Inner diameter(mm),wca,q,sigma
+TreeBasedRegressor_Diversity_self,0.42857142857142855,0.6666666666666666,0.0,0.35,0.625,0.7857142857142857,0.6555,,,
+TreeBasedRegressor_Diversity_self,0.42857142857142855,0.75,1.0,0.35,0.5,0.7857142857142857,0.6555,,,
+TreeBasedRegressor_Diversity_self,0.5714285714285714,0.6666666666666666,0.0,0.35,1.0,0.7857142857142857,0.6555,,,
+TreeBasedRegressor_Diversity_self,0.7142857142857142,0.6666666666666666,0.0,0.35,1.0,0.7857142857142857,0.6555,,,
+TreeBasedRegressor_Diversity_self,0.42857142857142855,1.0,0.0,1.0,0.5,0.6785714285714286,1.0,,,
+TreeBasedRegressor_Diversity_self,0.42857142857142855,1.0,0.0,0.35,0.5,0.7857142857142857,1.0,,,
+TreeBasedRegressor_Diversity_self,0.8571428571428571,0.6666666666666666,0.0,0.35,0.625,0.6785714285714286,1.0,,,
+TreeBasedRegressor_Diversity_self,0.42857142857142855,1.0,1.0,0.35,1.0,0.8928571428571428,1.0,,,
+TreeBasedRegressor_Diversity_self,0.7142857142857142,0.6666666666666666,1.0,0.35,0.5,0.8928571428571428,0.311,,,
+TreeBasedRegressor_Diversity_self,0.7142857142857142,0.75,1.0,0.35,0.5,0.8928571428571428,0.48325,,,

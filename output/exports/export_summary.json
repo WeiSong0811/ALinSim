@@ -1,0 +1,15 @@
+{
+  "exported_count": 8,
+  "failed_count": 0,
+  "exported_files": [
+    "output\\exports\\GaussianProcessBased_candidates.csv",
+    "output\\exports\\GSBAG_candidates.csv",
+    "output\\exports\\QueryByCommittee_candidates.csv",
+    "output\\exports\\RandomSearch_candidates.csv",
+    "output\\exports\\TreeBasedRegressor_Diversity_candidates.csv",
+    "output\\exports\\TreeBasedRegressor_Diversity_self_candidates.csv",
+    "output\\exports\\TreeBasedRegressor_Representativity_candidates.csv",
+    "output\\exports\\TreeBasedRegressor_Representativity_self_candidates.csv"
+  ],
+  "failed": []
+}

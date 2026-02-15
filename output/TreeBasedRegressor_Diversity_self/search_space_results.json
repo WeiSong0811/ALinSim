@@ -1,0 +1,135 @@
+{
+  "mode": "search_space",
+  "method": "TreeBasedRegressor_Diversity_self",
+  "search_space_json": "C:\\Users\\weiso\\Documents\\GitHub\\ALinSim\\data\\search_space.json",
+  "labeled_seed_csv": "C:\\Users\\weiso\\Documents\\GitHub\\ALinSim\\data\\seed_10_samples.csv",
+  "target_columns": [
+    "wca",
+    "q",
+    "sigma"
+  ],
+  "feature_columns": [
+    "PS:PAN ratio",
+    "Feed rate(mL/h)",
+    "Distance(cm)",
+    "Mass fraction of solute",
+    "Mass fraction of SiO2 in solute",
+    "Applied voltage(kV)",
+    "Inner diameter(mm)"
+  ],
+  "total_candidates": 78125,
+  "search_rounds": 1,
+  "n_pro_query": 10,
+  "random_state": 42,
+  "rounds": [
+    {
+      "round": 1,
+      "selected_indices": [
+        37,
+        5637,
+        15737,
+        31362,
+        13009,
+        12514,
+        46909,
+        15119,
+        33765,
+        36891
+      ],
+      "selected_candidates": [
+        {
+          "PS:PAN ratio": 0.42857142857142855,
+          "Feed rate(mL/h)": 0.6666666666666666,
+          "Distance(cm)": 0.0,
+          "Mass fraction of solute": 0.35,
+          "Mass fraction of SiO2 in solute": 0.625,
+          "Applied voltage(kV)": 0.7857142857142857,
+          "Inner diameter(mm)": 0.6555
+        },
+        {
+          "PS:PAN ratio": 0.42857142857142855,
+          "Feed rate(mL/h)": 0.75,
+          "Distance(cm)": 1.0,
+          "Mass fraction of solute": 0.35,
+          "Mass fraction of SiO2 in solute": 0.5,
+          "Applied voltage(kV)": 0.7857142857142857,
+          "Inner diameter(mm)": 0.6555
+        },
+        {
+          "PS:PAN ratio": 0.5714285714285714,
+          "Feed rate(mL/h)": 0.6666666666666666,
+          "Distance(cm)": 0.0,
+          "Mass fraction of solute": 0.35,
+          "Mass fraction of SiO2 in solute": 1.0,
+          "Applied voltage(kV)": 0.7857142857142857,
+          "Inner diameter(mm)": 0.6555
+        },
+        {
+          "PS:PAN ratio": 0.7142857142857142,
+          "Feed rate(mL/h)": 0.6666666666666666,
+          "Distance(cm)": 0.0,
+          "Mass fraction of solute": 0.35,
+          "Mass fraction of SiO2 in solute": 1.0,
+          "Applied voltage(kV)": 0.7857142857142857,
+          "Inner diameter(mm)": 0.6555
+        },
+        {
+          "PS:PAN ratio": 0.42857142857142855,
+          "Feed rate(mL/h)": 1.0,
+          "Distance(cm)": 0.0,
+          "Mass fraction of solute": 1.0,
+          "Mass fraction of SiO2 in solute": 0.5,
+          "Applied voltage(kV)": 0.6785714285714286,
+          "Inner diameter(mm)": 1.0
+        },
+        {
+          "PS:PAN ratio": 0.42857142857142855,
+          "Feed rate(mL/h)": 1.0,
+          "Distance(cm)": 0.0,
+          "Mass fraction of solute": 0.35,
+          "Mass fraction of SiO2 in solute": 0.5,
+          "Applied voltage(kV)": 0.7857142857142857,
+          "Inner diameter(mm)": 1.0
+        },
+        {
+          "PS:PAN ratio": 0.8571428571428571,
+          "Feed rate(mL/h)": 0.6666666666666666,
+          "Distance(cm)": 0.0,
+          "Mass fraction of solute": 0.35,
+          "Mass fraction of SiO2 in solute": 0.625,
+          "Applied voltage(kV)": 0.6785714285714286,
+          "Inner diameter(mm)": 1.0
+        },
+        {
+          "PS:PAN ratio": 0.42857142857142855,
+          "Feed rate(mL/h)": 1.0,
+          "Distance(cm)": 1.0,
+          "Mass fraction of solute": 0.35,
+          "Mass fraction of SiO2 in solute": 1.0,
+          "Applied voltage(kV)": 0.8928571428571428,
+          "Inner diameter(mm)": 1.0
+        },
+        {
+          "PS:PAN ratio": 0.7142857142857142,
+          "Feed rate(mL/h)": 0.6666666666666666,
+          "Distance(cm)": 1.0,
+          "Mass fraction of solute": 0.35,
+          "Mass fraction of SiO2 in solute": 0.5,
+          "Applied voltage(kV)": 0.8928571428571428,
+          "Inner diameter(mm)": 0.311
+        },
+        {
+          "PS:PAN ratio": 0.7142857142857142,
+          "Feed rate(mL/h)": 0.75,
+          "Distance(cm)": 1.0,
+          "Mass fraction of solute": 0.35,
+          "Mass fraction of SiO2 in solute": 0.5,
+          "Applied voltage(kV)": 0.8928571428571428,
+          "Inner diameter(mm)": 0.48325
+        }
+      ]
+    }
+  ],
+  "final_labeled_size": 600,
+  "remaining_pool_size": 78115
+}

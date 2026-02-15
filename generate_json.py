@@ -25,13 +25,13 @@ OUTPUT_JSON = Path("data/search_space.json")
 # Optional:
 # - type: "int" or "float" (default: "float")
 FEATURE_SPECS: List[Dict[str, Any]] = [
-    {"name": "PS:PAN ratio", "min": 0.1, "max": 0.99, "count": 10, "type": "float"},
-    {"name": "Feed rate(mL/h)", "min": 0.1, "max": 0.99, "count": 10, "type": "float"},
-    {"name": "Distance(cm)", "min": 0.1, "max": 0.99, "count": 10, "type": "float"},
-    {"name": "Mass fraction of solute", "min": 0.1, "max": 0.99, "count": 10, "type": "float"},
-    {"name": "Mass fraction of SiO2 in solute ", "min": 0.1, "max": 0.99, "count": 10, "type": "float"},
-    {"name": "Applied voltage(kV)", "min": 0.1, "max": 0.99, "count": 10, "type": "float"},
-    {"name": "Inner diameter(mm)", "min": 0.1, "max": 0.99, "count": 10, "type": "float"},
+    {"name": "PS:PAN ratio", "min": 3/7, "max": 1, "count": 5, "type": "float"},
+    {"name": "Feed rate(mL/h)", "min": 2/3, "max": 1, "count": 5, "type": "float"},
+    {"name": "Distance(cm)", "min": 0, "max": 1, "count": 5, "type": "float"},
+    {"name": "Mass fraction of solute", "min": 0.35, "max": 1, "count": 5, "type": "float"},
+    {"name": "Mass fraction of SiO2 in solute ", "min": 0.5, "max": 1, "count": 5, "type": "float"},
+    {"name": "Applied voltage(kV)", "min": 4/7, "max": 1, "count": 5, "type": "float"},
+    {"name": "Inner diameter(mm)", "min": 0.311, "max": 1, "count": 5, "type": "float"},
 ]
 def validate_feature_spec(spec: Dict[str, Any]) -> None:
     required = {"name", "min", "max", "count"}

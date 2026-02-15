@@ -20,8 +20,8 @@ import pandas as pd
 
 # Edit here
 OUTPUT_ROOT = Path("output")
-EXPORT_DIR = OUTPUT_ROOT / "round1_exports"
-METHODS: List[str] = ['RandomSearch']  # [] means auto-discover all methods with search_space_results.json
+EXPORT_DIR = OUTPUT_ROOT / "exports"
+METHODS: List[str] = []  # [] means auto-discover all methods with search_space_results.json
 
 
 def discover_result_files(output_root: Path, methods: List[str]) -> List[Path]:
@@ -46,16 +46,12 @@ def to_dataframe(payload: Dict[str, Any]) -> pd.DataFrame:
     df = pd.DataFrame(candidates)
     # Keep metadata so each row can be traced.
     df.insert(0, "method", method)
-    df.insert(1, "round", 1)
-
     # Add label columns as empty placeholders for real experiment outcomes.
     for col in target_columns:
         if col not in df.columns:
             df[col] = pd.NA
 
     return df
-
-
 def main() -> None:
     EXPORT_DIR.mkdir(parents=True, exist_ok=True)
     files = discover_result_files(OUTPUT_ROOT, METHODS)
@@ -70,7 +66,7 @@ def main() -> None:
                 payload = json.load(f)
             df = to_dataframe(payload)
             method = payload.get("method", file_path.parent.name)
-            out_file = EXPORT_DIR / f"{method}_round1_candidates.csv"
+            out_file = EXPORT_DIR / f"{method}_candidates.csv"
             df.to_csv(out_file, index=False, encoding="utf-8")
             exported.append(str(out_file))
         except Exception as e:

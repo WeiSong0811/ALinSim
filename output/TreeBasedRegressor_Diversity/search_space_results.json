@@ -1,6 +1,6 @@
 {
   "mode": "search_space",
-  "method": "RandomSearch",
+  "method": "TreeBasedRegressor_Diversity",
   "search_space_json": "C:\\Users\\weiso\\Documents\\GitHub\\ALinSim\\data\\search_space.json",
   "labeled_seed_csv": "C:\\Users\\weiso\\Documents\\GitHub\\ALinSim\\data\\seed_10_samples.csv",
   "target_columns": [
