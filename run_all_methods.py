@@ -21,7 +21,6 @@ from typing import Any, Dict, List, Tuple
 import numpy as np
 import pandas as pd
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C, WhiteKernel
-from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
@@ -49,12 +48,12 @@ EMBEDDED_CONFIG: Dict[str, Any] = {
     # search-space mode
     "search_space_json": "data/search_space.json",
     "labeled_csv": "data/seed_10_samples.csv",
-    "search_rounds": 2,
+    "search_rounds": 1,
 
     # shared run settings
     "random_state": 42,
     "initial_method": "random",  # random, greedy_search, kmeans, ncc
-    "n_initial": 10,
+    "n_initial": 500,
     "n_pro_query": 10,
     "test_size": 0.2,
     "threshold": 0.85,
@@ -485,12 +484,9 @@ def run_search_space_mode(
         X_labeled_raw = X_seed.copy()
         y_labeled = y_seed.copy()
         X_pool_raw = pool_raw.copy()
+
         rounds: List[Dict[str, Any]] = []
-
-        for round_idx in range(args.search_rounds):
-            if X_pool_raw.empty:
-                break
-
+        if not X_pool_raw.empty:
             scaler = StandardScaler()
             scaler.fit(pd.concat([X_labeled_raw, X_pool_raw], axis=0))
             X_labeled_scaled = pd.DataFrame(
@@ -506,37 +502,17 @@ def run_search_space_mode(
                 y_labeled=y_labeled,
                 X_unlabeled=X_pool_scaled,
                 n_pro_query=args.n_pro_query,
-                random_state=args.random_state + round_idx,
+                random_state=args.random_state,
             )
-            if not selected_idx:
-                break
 
-            selected_raw = X_pool_raw.loc[selected_idx].copy()
-
-            # Surrogate-based pseudo labels to continue iterative search without full true labels.
-            surrogate = RandomForestRegressor(
-                n_estimators=200, random_state=args.random_state + round_idx
-            )
-            surrogate.fit(X_labeled_raw, y_labeled)
-            pseudo = surrogate.predict(selected_raw)
-            if len(target_columns) == 1:
-                pseudo_2d = np.array(pseudo).reshape(-1, 1)
-            else:
-                pseudo_2d = np.array(pseudo)
-            selected_target = pd.DataFrame(pseudo_2d, index=selected_raw.index, columns=target_columns)
-
-            rounds.append({
-                "round": round_idx + 1,
-                "selected_indices": [int(i) for i in selected_idx],
-                "selected_candidates": selected_raw.to_dict(orient="records"),
-                "pseudo_target": selected_target.reset_index(drop=True).to_dict(orient="records"),
-            })
-
-            X_labeled_raw = pd.concat([X_labeled_raw, selected_raw], axis=0).reset_index(drop=True)
-            y_labeled = pd.concat(
-                [y_labeled, selected_target.reset_index(drop=True)], axis=0
-            ).reset_index(drop=True)
-            X_pool_raw = X_pool_raw.drop(index=selected_idx).reset_index(drop=True)
+            if selected_idx:
+                selected_raw = X_pool_raw.loc[selected_idx].copy()
+                rounds.append({
+                    "round": 1,
+                    "selected_indices": [int(i) for i in selected_idx],
+                    "selected_candidates": selected_raw.to_dict(orient="records"),
+                })
+                X_pool_raw = X_pool_raw.drop(index=selected_idx).reset_index(drop=True)
 
         out_file = method_dir / "search_space_results.json"
         result = {
@@ -547,7 +523,7 @@ def run_search_space_mode(
             "target_columns": target_columns,
             "feature_columns": feature_columns,
             "total_candidates": int(len(pool_raw)),
-            "search_rounds": args.search_rounds,
+            "search_rounds": 1,
             "n_pro_query": args.n_pro_query,
             "random_state": args.random_state,
             "rounds": rounds,
