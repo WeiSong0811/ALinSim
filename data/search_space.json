@@ -1,0 +1,44 @@
+{
+  "PS:PAN ratio": {
+    "min": 0.1,
+    "max": 0.99,
+    "count": 10,
+    "type": "float"
+  },
+  "Feed rate(mL/h)": {
+    "min": 0.1,
+    "max": 0.99,
+    "count": 10,
+    "type": "float"
+  },
+  "Distance(cm)": {
+    "min": 0.1,
+    "max": 0.99,
+    "count": 10,
+    "type": "float"
+  },
+  "Mass fraction of solute": {
+    "min": 0.1,
+    "max": 0.99,
+    "count": 10,
+    "type": "float"
+  },
+  "Mass fraction of SiO2 in solute": {
+    "min": 0.1,
+    "max": 0.99,
+    "count": 10,
+    "type": "float"
+  },
+  "Applied voltage(kV)": {
+    "min": 0.1,
+    "max": 0.99,
+    "count": 10,
+    "type": "float"
+  },
+  "Inner diameter(mm)": {
+    "min": 0.1,
+    "max": 0.99,
+    "count": 10,
+    "type": "float"
+  }
+}
