@@ -14,3 +14,6 @@ run_all_methods.py
 export_round1_candidates.py
 取生成的特征值导出为训练仿真用的csv文件
 
+
+GP+US: Performance of uncertainty-based active learning for efficient approximation of black-box functions in materials science
+SVM（RBF核）+ GS/IGS: Exploring active learning strategies for predictive models in mechanics of materials
