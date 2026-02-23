@@ -50,3 +50,38 @@ GBR+ Query-by-Committee(SVR（Support Vector Regression）+ GBR（Gradient Boost
 1. 三个仿真分别生成一个示例性质的数据集，使用拉丁超立方scipy.stats.qmc.LatinHypercube进行采样。200个数据点。
 
 2. 对照试验设计：
+
+pan仿真
+
+seed 40-50 10seed
+
+参数空间 每个维度10个样本
+
+测试集使用拉丁超立方采样100，采样之后要把100个删掉
+
+初始采样 从(参数空间-100)中随机采样 5个 
+
+主动学习采样，每次采样 2个 采样20
+
+策略：
+autosklearn(RF) + treebased_representativity_self.py  先做这个
+
+GP + US
+
+结果处理：
+每个步骤包括初始采样和主动学习采样步骤，都会有Metric(R2,MAE,RMSE) 做10个seed的平均
+画出来一个，plot，plot里有一个折线，X轴是数据集大小(采样次数) Y轴是 Metric。
+
+脚本逻辑：
+1. run_activelearning 获得 采样的(绝对)index。[[1,5,7,9,11],[52,26],[16,87]...]
+python run_active_learning.py --random_state $index1
+
+最后会有10个Json结果文件 名字seed_40 - seed_49
+[[],[],[],[],.....]
+
+2. run_automl 根据index获取训练集。模拟数据集越来越大，但是可以并行。
+index2 = 0 1 2 3 ... 20
+python run_automl.py --random_state $index1 --sampling_steps $index2
+
+
+计算平台：超算，bash脚本的array功能，纯平行。
