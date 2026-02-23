@@ -14,4 +14,6 @@ def check_duplicate_rows(csv_path):
 
         print("\n重复行数量:", dup_rows.shape[0])
 
-check_duplicate_rows("FEA_inpute_pos.csv")
+for seed in [40, 41, 42, 43, 44, 45, 46, 47, 48, 49]:
+    print(f"\nChecking for duplicate rows in FEA_inpute_pos.csv for seed {seed}:")
+    check_duplicate_rows(f"./test_data/pan_inpute_test_{seed}.csv")

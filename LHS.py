@@ -101,45 +101,45 @@ def save_csv(samples, headers, out_path):
         w.writerows(samples)
 
 if __name__ == "__main__":
-    N = 200
-    seed = 42
+    N = 100
+    for seed in [40, 41, 42, 43, 44, 45, 46, 47, 48, 49]:
+        param_specs = [
+            (3/7, 1), # continuous uniform
+            (2/3, 1),
+            (0, 1),
+            (0.35, 1),
+            (0.5, 1),
+            (4/7, 1),
+            (0.311, 1),
+            #{'low': 1, 'high': 100, 'dtype': 'int'},  # continuous integer
+            #[100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240, 250],  # discrete list
+            #[1, 1.25, 1.5, 1.75, 2, 2.25],
+            #[1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000],
+            #[24000, 26700, 30100, 32800, 34800, 37400, 39600, 42200],
+            #[-1.4, -2.0, -2.5, -3.0, -3.5, -4.0, -5.0],
+            #[0, -0.25, -1, -1.25, -1.5],
+            #[0.1, 0.15, 0.2, 0.25, 0.3]
+            #{'values': ['red', 'green', 'blue']}  # discrete categorical
+        ]
+        samples = lhs_mixed(param_specs, n_samples=N, seed=seed)
+        
+        headers = ['PS:PAN ratio', 
+                'Feed rate(mL/h)', 
+                'Distance(cm)', 
+                'Mass fraction of solute', 
+                'Mass fraction of SiO2 in solute ', 
+                'Applied voltage(kV)',
+                'Inner diameter(mm)']
+        '''
+        headers = ['d',
+                'h/d',
+                'b',
+                'E',
+                'll',
+                'sdl',
+                'position'
+                ]
+        '''
+        save_csv(samples, headers, f'./test_data/pan_inpute_test_{seed}.csv')
 
-    param_specs = [
-        #(3/7, 1), # continuous uniform
-        #(2/3, 1),
-        #(0, 1),
-        #(0.35, 1),
-        #(0.5, 1),
-        #(4/7, 1),
-        #(0.311, 1),
-        #{'low': 1, 'high': 100, 'dtype': 'int'},  # continuous integer
-        [100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240, 250],  # discrete list
-        [1, 1.25, 1.5, 1.75, 2, 2.25],
-        [1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000],
-        [24000, 26700, 30100, 32800, 34800, 37400, 39600, 42200],
-        [-1.4, -2.0, -2.5, -3.0, -3.5, -4.0, -5.0],
-        [0, -0.25, -1, -1.25, -1.5],
-        [0.1, 0.15, 0.2, 0.25, 0.3]
-        #{'values': ['red', 'green', 'blue']}  # discrete categorical
-    ]
-    samples = lhs_mixed(param_specs, n_samples=N, seed=seed)
-    '''
-    headers = ['PS:PAN ratio', 
-               'Feed rate(mL/h)', 
-               'Distance(cm)', 
-               'Mass fraction of solute', 
-               'Mass fraction of SiO2 in solute ', 
-               'Applied voltage(kV)',
-               'Inner diameter(mm)']
-    '''
-    headers = ['d',
-               'h/d',
-               'b',
-               'E',
-               'll',
-               'sdl',
-               'position'
-               ]
-    save_csv(samples, headers, 'FEA_inpute_pos.csv')
-
-    print('LHS sampling completed and saved to FEA_inpute_pos.csv')
+        print(f'LHS sampling completed and saved to ./test_data/pan_inpute_test_{seed}.csv')
