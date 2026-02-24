@@ -11,7 +11,7 @@ from sklearn.preprocessing import StandardScaler
 from torch.backends.opt_einsum import strategy
 from tqdm import tqdm
 import json
-from utils import data_process, data_process_yin, data_process_meta, active_learning
+from utils import data_process, data_process_meta, active_learning, generation_pool
 from strategies import TreeBasedRegressor_Representativity_self
 import warnings
 # from config_loader import load_config, create_kernel
@@ -34,14 +34,16 @@ test_method = ["normal",
 parser = argparse.ArgumentParser(description="Run AutoSklearn on a specific dataset.")
 parser.add_argument("--random_state", type=int, required=True, help="Random state for fitting.")
 parser.add_argument("--initial-method", type=str, default='random', help="Initial method for active learning.")
-parser.add_argument("--strategy-idx", type=int, required=True, help="ID of the strategy to fit.")
+# parser.add_argument("--strategy-idx", type=int, required=True, help="ID of the strategy to fit.")
 parser.add_argument("--dataset-idx", type=int, required=True, help="ID of the dataset to fit.")
 parser.add_argument("--n_pro_query", type=int, default=10, help="Number of queries per iteration.")
 # parser.add_argument("--time-limit", type=int, default=3600, help="Time limit for fitting in seconds.")
 args = parser.parse_args()
 random_state = args.random_state
 initial_method = args.initial_method
-strategy_num_int = args.strategy_idx
+# strategy_num_int = args.strategy_idx
+strategy_num_int = 0
+
 datasets_num_int = args.dataset_idx
 n_pro_query = args.n_pro_query
 
@@ -77,8 +79,10 @@ estimators = [TreeBasedRegressor_Representativity_self(random_state=random_state
 # if not os.path.exists(f"../result/random_state_{random_state}_{initial_method}"):
 #     os.makedirs(f"../result/random_state_{random_state}_{initial_method}")
 
-datasets = data_process_meta('../dataset/meta.csv', random_state=random_state)
+X_test, X_pool_filtered = generation_pool(seed=random_state)
+X_test.to_csv(f'./data/X_test.csv')
 
+# 创建输出文件夹
 result_path = f"../result_review/"
 result_path = os.path.join(result_path, str(n_pro_query), str(random_state), initial_method)
 
@@ -91,12 +95,15 @@ if not os.path.exists(result_path):
     
 print(f'result_path: {result_path}')
 print(f'result_time_record_path: {result_time_record_path}')
+
+
 results = {}
 
 
-datasets_list = list(datasets.items())
+datasets_list = list(X_pool_filtered.items())
 key = datasets_list[datasets_num_int][0]
 value = datasets_list[datasets_num_int][1]
+
 estimators_list = [estimators[strategy_num_int]]
 
 print('*' * 15, f'Processing {key} dataset')
