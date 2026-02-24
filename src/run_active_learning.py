@@ -2,13 +2,11 @@ import random
 import argparse
 import numpy as np
 import pandas as pd
-import torch
 from matplotlib import pyplot as plt
 from sklearn.gaussian_process.kernels import RBF, Matern, ConstantKernel as C, WhiteKernel
 from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from torch.backends.opt_einsum import strategy
 from tqdm import tqdm
 import json
 from utils import data_process, data_process_meta, active_learning, generation_pool, func
@@ -63,12 +61,8 @@ current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 # 设置随机种子
 def set_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
     random.seed(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
 
 set_seed(random_state)
 # 定义主动学习策略
@@ -104,8 +98,8 @@ estimators_list = [estimators[strategy_num_int]]
 # print('*' * 15, f'Processing {key} dataset')
 
 X_t = X_pool_filtered
-X_val = X_test.to_numpy(dtype=float)
-y_val = func(X_val)
+X_val = X_test.copy()
+y_val = func(X_val.to_numpy(dtype=float))
 y_val = pd.DataFrame(y_val, columns=["wca", "q", "sigma"])
 y_val_out = pd.concat([X_test.reset_index(drop=True), y_val], axis=1)
 y_val_out.to_csv(f'../data/pan_test.csv', index=False)

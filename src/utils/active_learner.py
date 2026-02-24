@@ -13,12 +13,9 @@ Created: 2025-01-06
 
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 from tqdm import tqdm
 from .initialize import initialize
-from sklearn.model_selection import LeaveOneOut, KFold, cross_val_score
-from xgboost import XGBRegressor
 import time
 from .Sim_PAN import func
 
@@ -114,8 +111,13 @@ def active_learning(estimators, X_t, X_val, y_val, n_initial, n_pro_query, n_que
     metrics_all = {}
 
     def eval_metrics(X_labeled, y_labeled):
+        import autosklearn.regression
         # Simple baseline model for per-round evaluation
-        model = RandomForestRegressor(n_estimators=200, random_state=random_state)
+        model = autosklearn.regression.AutoSklearnRegressor(time_left_for_this_task=120, 
+                                                            per_run_time_limit=30,
+                                                            seed=random_state,
+                                                            n_jobs=1,
+                                                            memory_limit=36000)
         model.fit(X_labeled, y_labeled)
         y_pred = model.predict(X_val)
         r2 = r2_score(y_val, y_pred, multioutput='variance_weighted')
@@ -132,8 +134,7 @@ def active_learning(estimators, X_t, X_val, y_val, n_initial, n_pro_query, n_que
 
         idx_batch.append(initial_idx)
         X_labeled, X_unlabeled = data_extraction(initial_idx, X_unlabeled)
-        X_labeled_np = X_labeled.to_numpy(dtype=float)
-        y_labeled = func(X_labeled_np)
+        y_labeled = func(X_labeled.to_numpy(dtype=float))
         y_labeled = pd.DataFrame(y_labeled, columns=["wca", "q", "sigma"])
         # y_labeled, y_unlabeled = data_extraction(initial_idx, y_unlabeled)
 

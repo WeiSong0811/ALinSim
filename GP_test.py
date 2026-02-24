@@ -9,20 +9,22 @@ import numpy as np
 from xgboost import XGBRegressor
 from matplotlib import pyplot as plt
 import warnings
+from src.utils import generation_pool, func, initialize, data_extraction
+
+
 warnings.filterwarnings("ignore")
 # Load the dataset
-data = pd.read_csv('data/concrete_data.csv')  # Replace with your dataset path
+
+# data = pd.read_csv('data/pan_test.csv')  # Replace with your dataset path
 # define seed for reproducibility
 
-
-target_variable = 'concrete_compressive_strength'  # Replace with your target variable name
+target_variable = ['wca', 'q', 'sigma']  # Replace with your target variable name
 # Separate features and target variable
-X = data.drop(columns=[target_variable])  # Replace 'target' with your target variable name
-y = data[target_variable]
-test_size = 150
+# X_test = data.drop(columns=target_variable)  # Replace 'target' with your target variable name
+# y_test = data[target_variable]
+# test_size = 0.2
 
-train_sizes = [5,10,15,20,25,30,35,40]
-
+train_sizes = [5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43]
 
 GP_matern_mse_train_size_list = []
 GP_matern_r2_train_size_list = []
@@ -43,13 +45,25 @@ for train_size in train_sizes:
     RF_r2_list = []
     XGB_mse_list = []
     XGB_r2_list = []
-    for seed in range(10):
+    for seed in [40, 41, 42, 43, 44, 45, 46, 47, 48, 49]:
         np.random.seed(seed)
+
+        X_test, X_pool_filtered = generation_pool(seed=seed)
+        X_test = X_test.to_numpy(dtype=float)
+        y_test = func(X_test)
+        y_test = pd.DataFrame(y_test, columns=["wca", "q", "sigma"])
+
+        X_unlabeled = X_pool_filtered.copy() # 参数空间
+        initial_idx = initialize(X_unlabeled, train_size, method="random", random_state=seed)
+        X_labeled, X_unlabeled = data_extraction(initial_idx, X_unlabeled)
+        X_labeled_np = X_labeled.to_numpy(dtype=float)
+        y_labeled = func(X_labeled_np)
+        y_labeled = pd.DataFrame(y_labeled, columns=["wca", "q", "sigma"])
         # Split the dataset into training and testing sets 训练集占20%，测试集占80%
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, train_size=train_size, random_state=seed)
+
         # Standardize the features
         scaler = StandardScaler()
-        X_train = scaler.fit_transform(X_train)
+        X_train = scaler.fit_transform(X_labeled)
         X_test = scaler.transform(X_test)
 
         d = X_train.shape[1]  # 你的特征维度
@@ -76,10 +90,10 @@ for train_size in train_sizes:
         RF = RandomForestRegressor(n_estimators=100, random_state=seed)
         XGB = XGBRegressor(n_estimators=100, random_state=seed)
         # Fit the models to the training data
-        gp_matern.fit(X_train, y_train)
-        gp_rbf.fit(X_train, y_train)
-        RF.fit(X_train, y_train)
-        XGB.fit(X_train, y_train)
+        gp_matern.fit(X_train, y_labeled)
+        gp_rbf.fit(X_train, y_labeled)
+        RF.fit(X_train, y_labeled)
+        XGB.fit(X_train, y_labeled)
 
 
         ##################################### Autosklearn
@@ -131,12 +145,12 @@ for train_size in train_sizes:
     XGB_mse_train_size_list.append(XGB_mse_mean)
     XGB_r2_train_size_list.append(XGB_r2_mean)
 plt.figure(figsize=(10, 6))
-plt.plot(train_sizes, GP_matern_mse_train_size_list, label='GP Matern MSE', marker='o')
-plt.plot(train_sizes, GP_rbf_mse_train_size_list, label='GP RBF MSE', marker='o')
-plt.plot(train_sizes, RF_mse_train_size_list, label='Random Forest MSE', marker='o')
-plt.plot(train_sizes, XGB_mse_train_size_list, label='XGBoost MSE', marker='o')
+plt.plot(train_sizes, GP_matern_r2_train_size_list, label='GP Matern R2', marker='o')
+plt.plot(train_sizes, GP_rbf_r2_train_size_list, label='GP RBF R2', marker='o')
+plt.plot(train_sizes, RF_r2_train_size_list, label='Random Forest R2', marker='o')
+plt.plot(train_sizes, XGB_r2_train_size_list, label='XGBoost R2', marker='o')
 plt.xlabel('Training Set Size')
-plt.ylabel('Mean Squared Error')
+plt.ylabel('R² Score')
 plt.title('Model Performance with Varying Training Set Sizes')
 plt.legend()
 # print(f'Matern Kernel - MSE: {mse_matern:.4f}, R²: {r2_matern:.4f}')
