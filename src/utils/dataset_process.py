@@ -17,7 +17,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-
+'''
 def data_process_yin(file_path, random_state=36):
     """
     Process dataset for pullout/interface studies.
@@ -61,7 +61,7 @@ def data_process_yin(file_path, random_state=36):
     y_val = y_val.reset_index(drop=True)
 
     return X_t, X_val, y_t, y_val
-
+'''
 
 def data_process(file_path, target_columns, target_to_fit, random_state=36):
     """

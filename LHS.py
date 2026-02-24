@@ -15,8 +15,22 @@ def _parse_spec(spec):
         
         if 'low' in spec and 'high' in spec:
             low, high = spec['low'], spec['high']
-            if not (_is_number(low)) and _is_number(high) and high > low:
+            if not (_is_number(low) and _is_number(high) and high > low):
                 raise ValueError(f"Low and high must be numbers and low < high: low={low}, high={high}")
+            if 'num' in spec:
+                num = int(spec['num'])
+                if num < 2:
+                    raise ValueError(f'"num" must be >= 2 for discrete generation: num={num}')
+                dtype = spec.get('dtype', 'float')
+                vals = np.linspace(float(low), float(high), num=num)
+                decimals = spec.get('decimals', None)
+                if decimals is not None:
+                    vals = np.round(vals, decimals=int(decimals))
+                if dtype == 'int':
+                    vals = np.unique(np.rint(vals).astype(int))
+                    if len(vals) < 2:
+                        raise ValueError(f'Integer discretization collapsed to <2 unique values: {vals}')
+                return {'kind': 'discrete', 'values': np.asarray(vals, dtype=object)}
             scale = spec.get('scale', 'linear')
             dtype = spec.get('dtype', 'float')
             return {'kind': 'continuous', 'low': float(low), 'high': float(high), 'scale': scale, 'dtype': dtype}
@@ -35,7 +49,7 @@ def _parse_spec(spec):
     
     raise ValueError(f"Invalid spec format: {spec}")
 
-def lhs_mixed(param_specs, n_samples=200, seed=42):
+def lhs_mixed(param_specs, n_samples=200, seed=42, decimals=None):
 
     rng = np.random.default_rng(seed)
     specs = [_parse_spec(s) for s in param_specs]
@@ -63,6 +77,8 @@ def lhs_mixed(param_specs, n_samples=200, seed=42):
             
             if sp.get('dtype', 'float') == 'int':
                 x = np.rint(x).astype(int)
+            elif decimals is not None:
+                x = np.round(x, decimals=decimals)
 
             samples[:, j] = x.astype(object)
         
@@ -104,13 +120,13 @@ if __name__ == "__main__":
     N = 100
     for seed in [40, 41, 42, 43, 44, 45, 46, 47, 48, 49]:
         param_specs = [
-            (3/7, 1), # continuous uniform
-            (2/3, 1),
-            (0, 1),
-            (0.35, 1),
-            (0.5, 1),
-            (4/7, 1),
-            (0.311, 1),
+            {'low': 3/7, 'high': 1, 'num': 10, 'decimals': 5},
+            {'low': 2/3, 'high': 1, 'num': 10, 'decimals': 5},
+            {'low': 0, 'high': 1, 'num': 10, 'decimals': 5},
+            {'low': 0.35, 'high': 1, 'num': 10, 'decimals': 5},
+            {'low': 0.5, 'high': 1, 'num': 10, 'decimals': 5},
+            {'low': 4/7, 'high': 1, 'num': 10, 'decimals': 5},
+            {'low': 0.311, 'high': 1, 'num': 10, 'decimals': 5},
             #{'low': 1, 'high': 100, 'dtype': 'int'},  # continuous integer
             #[100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240, 250],  # discrete list
             #[1, 1.25, 1.5, 1.75, 2, 2.25],
@@ -140,6 +156,6 @@ if __name__ == "__main__":
                 'position'
                 ]
         '''
-        save_csv(samples, headers, f'./test_data/pan_inpute_test_{seed}.csv')
+        save_csv(samples, headers, f'./test_data/pan_inpute_test_10_{seed}.csv')
 
-        print(f'LHS sampling completed and saved to ./test_data/pan_inpute_test_{seed}.csv')
+        print(f'LHS sampling completed and saved to ./test_data/pan_inpute_test_10_{seed}.csv')
