@@ -20,6 +20,7 @@ from .initialize import initialize
 from sklearn.model_selection import LeaveOneOut, KFold, cross_val_score
 from xgboost import XGBRegressor
 import time
+from .Sim_PAN import func
 
 class RandomSearch:
     """
@@ -76,8 +77,8 @@ def data_extraction(idx, X):
     return extracted_data, remaining_data
 
 
-def active_learning(estimators, X_t, y_t, X_val, y_val, n_initial, n_pro_query, n_queries, threshold,
-                    initial_method="random", test_methods=None, random_state=36, record_metrics=False):
+def active_learning(estimators, X_t, X_val, y_val, n_initial, n_pro_query, n_queries, threshold,
+                    initial_method="random", random_state=36, record_metrics=True):
     """
     Main active learning loop for conducting experiments.
 
@@ -107,8 +108,6 @@ def active_learning(estimators, X_t, y_t, X_val, y_val, n_initial, n_pro_query, 
             - query_time_all: Dictionary containing timing information
     """
     random_strategy = RandomSearch(random_state=random_state)
-    if test_methods is None:
-        test_methods = ["normal"]
 
     query_idx_all = {}
     query_time_all = {}
@@ -127,14 +126,16 @@ def active_learning(estimators, X_t, y_t, X_val, y_val, n_initial, n_pro_query, 
     for estimator in estimators:
         idx_batch = []
         query_time = []
-        X_unlabeled = X_t.copy()
-        y_unlabeled = y_t.copy()
+        X_unlabeled = X_t.copy() # 参数空间
 
         initial_idx = initialize(X_unlabeled, n_initial, method=initial_method)
 
         idx_batch.append(initial_idx)
         X_labeled, X_unlabeled = data_extraction(initial_idx, X_unlabeled)
-        y_labeled, y_unlabeled = data_extraction(initial_idx, y_unlabeled)
+        X_labeled_np = X_labeled.to_numpy(dtype=float)
+        y_labeled = func(X_labeled_np)
+        y_labeled = pd.DataFrame(y_labeled, columns=["wca", "q", "sigma"])
+        # y_labeled, y_unlabeled = data_extraction(initial_idx, y_unlabeled)
 
         metrics = []
         if record_metrics:
@@ -144,18 +145,20 @@ def active_learning(estimators, X_t, y_t, X_val, y_val, n_initial, n_pro_query, 
             start = time.perf_counter()
             try:
                 query_idx = estimator.query(X_unlabeled=X_unlabeled, n_act=n_pro_query, X_labeled=X_labeled,
-                                            y_labeled=y_labeled, y_unlabeled=y_unlabeled)
+                                            y_labeled=y_labeled)
             except Exception as e:
                 query_idx = random_strategy.query(X_unlabeled=X_unlabeled, n_act=n_pro_query, X_labeled=X_labeled,
-                                            y_labeled=y_labeled, y_unlabeled=y_unlabeled)
+                                            y_labeled=y_labeled)
                 
             end = time.perf_counter()
             query_time.append(end - start)
 
             idx_batch.append(query_idx)
             X_query, X_unlabeled = data_extraction(query_idx, X_unlabeled)
-            y_query, y_unlabeled = data_extraction(query_idx, y_unlabeled)
+            # y_query, y_unlabeled = data_extraction(query_idx, y_unlabeled)
             X_labeled = pd.concat([X_labeled, X_query])
+            y_query = func(X_query.to_numpy(dtype=float))
+            y_query = pd.DataFrame(y_query, columns=["wca", "q", "sigma"])
             y_labeled = pd.concat([y_labeled, y_query])
             if record_metrics:
                 metrics.append(eval_metrics(X_labeled, y_labeled))

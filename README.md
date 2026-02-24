@@ -83,5 +83,4 @@ python run_active_learning.py --random_state $index1
 index2 = 0 1 2 3 ... 20
 python run_automl.py --random_state $index1 --sampling_steps $index2
 
-
 计算平台：超算，bash脚本的array功能，纯平行。
