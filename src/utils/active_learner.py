@@ -18,6 +18,11 @@ from tqdm import tqdm
 from .initialize import initialize
 import time
 from .Sim_PAN import func
+import autosklearn.regression
+import os
+import time
+import gc
+import shutil
 
 class RandomSearch:
     """
@@ -110,20 +115,37 @@ def active_learning(estimators, X_t, X_val, y_val, n_initial, n_pro_query, n_que
     query_time_all = {}
     metrics_all = {}
 
-    def eval_metrics(X_labeled, y_labeled):
-        import autosklearn.regression
+    def eval_metrics(X_labeled, y_labeled, random_state=random_state, ):
+        
         # Simple baseline model for per-round evaluation
-        model = autosklearn.regression.AutoSklearnRegressor(time_left_for_this_task=120, 
-                                                            per_run_time_limit=30,
-                                                            seed=random_state,
-                                                            n_jobs=1,
-                                                            memory_limit=36000)
-        model.fit(X_labeled, y_labeled)
-        y_pred = model.predict(X_val)
-        r2 = r2_score(y_val, y_pred, multioutput='variance_weighted')
-        mae = mean_absolute_error(y_val, y_pred)
-        rmse = float(np.sqrt(mean_squared_error(y_val, y_pred)))
-        return {"r2": float(r2), "mae": float(mae), "rmse": float(rmse)}
+        cur_time = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
+        tmp_dir = f"../tmp/autosklearn_{random_state}_{cur_time}"
+        if not os.path.exists(tmp_dir):
+            os.makedirs(tmp_dir)
+        try:
+            model = autosklearn.regression.AutoSklearnRegressor(time_left_for_this_task=120, 
+                                                                per_run_time_limit=30,
+                                                                seed=random_state,
+                                                                n_jobs=1,
+                                                                memory_limit=36000,
+                                                                tmp_folder=tmp_dir)
+
+            model.fit(X_labeled, y_labeled)
+            y_pred = model.predict(X_val)
+            r2 = r2_score(y_val, y_pred, multioutput='variance_weighted')
+            mae = mean_absolute_error(y_val, y_pred)
+            rmse = float(np.sqrt(mean_squared_error(y_val, y_pred)))
+
+            return {"r2": float(r2), "mae": float(mae), "rmse": float(rmse)}
+        
+        except Exception as e:
+            print(f"Error during model training/evaluation: {e}")
+            return {"r2": None, "mae": None, "rmse": None}
+
+        finally:
+            del model
+            gc.collect()
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
     for estimator in estimators:
         idx_batch = []
