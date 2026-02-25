@@ -14,8 +14,10 @@ warnings.filterwarnings("ignore")
 
 parser = argparse.ArgumentParser(description="Run GP_AL on a specific dataset.")
 parser.add_argument("--random_state", type=int, required=True, help="Random state for fitting.")
+parser.add_argument("--label_idx", type=int, default=0, help="Index of the target variable to fit.")
 # parser.add_argument("--time-limit", type=int, default=3600, help="Time limit for fitting in seconds.")
 args = parser.parse_args()
+label_idx = args.label_idx
 seed = args.random_state
 
 # data = pd.read_csv('data/concrete_data.csv')  # Replace with your dataset path
@@ -127,12 +129,12 @@ for step in range(query_steps+1):
     X_train_scaled = scaler.fit_transform(X_train)
     x_test_scaled = scaler.transform(x_test)
     
-    GP_active_learner.fit(X_train_scaled, y_train)
+    GP_active_learner.fit(X_train_scaled, y_train[:, label_idx])
     y_pred = GP_active_learner.predict(x_test_scaled)
 
-    mae_list.append(mean_absolute_error(y_test, y_pred))
-    rmse_list.append(root_mean_squared_error(y_test, y_pred))
-    r2_list.append(r2_score(y_test, y_pred))
+    mae_list.append(mean_absolute_error(y_test.iloc[:, label_idx], y_pred))
+    rmse_list.append(root_mean_squared_error(y_test.iloc[:, label_idx], y_pred))
+    r2_list.append(r2_score(y_test.iloc[:, label_idx], y_pred))
 
 # 保存结果到json
 import json
@@ -141,7 +143,7 @@ results = {
     "rmse": rmse_list,
     "r2": r2_list
 }
-with open(f'GP_AL_results_seed_{seed}.json', 'w') as f:
+with open(f'GP_AL_results_seed_{seed}_{label_idx}.json', 'w') as f:
     json.dump(results, f)
 
 

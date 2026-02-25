@@ -54,9 +54,9 @@ class GaussianProcessBased(GaussianProcessRegressor):
         # Get predictions with uncertainty estimates
         y_hat, std = self.predict(X_unlabeled, return_std=True)
 
-        sample_uncertainty = std.mean(axis=1)  # Average uncertainty across all target variables
+        # sample_uncertainty = std.mean(axis=1)  # Average uncertainty across all target variables
 
-        query_idx = np.argsort(sample_uncertainty)[-n_act:]
+        query_idx = np.argsort(std)[-n_act:]
         selected_indices = [i for i in X_unlabeled.index[query_idx.tolist()]]
-        
+
         return selected_indices
