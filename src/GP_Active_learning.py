@@ -8,6 +8,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score, mean_absolute_error, root_mean_squared_error
 import pandas as pd
 from strategies import GaussianProcessBased
+from utils import generation_pool, func, predict
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -17,17 +18,23 @@ parser.add_argument("--random_state", type=int, required=True, help="Random stat
 args = parser.parse_args()
 seed = args.random_state
 
-data = pd.read_csv('data/concrete_data.csv')  # Replace with your dataset path
-target_variable = 'concrete_compressive_strength'  # Replace with your target variable name
+# data = pd.read_csv('data/concrete_data.csv')  # Replace with your dataset path
+# target_variable = 'concrete_compressive_strength'  # Replace with your target variable name
+target_variable = ["wca", "q", "sigma"]
+x_test, X_pool_filtered = generation_pool(seed=seed)
+y_test = func(x_test.to_numpy(dtype=float))
+y_test = pd.DataFrame(y_test, columns=target_variable)
+
+x_train = X_pool_filtered.copy() # 参数空间
+
 global Parameter_space
 global y
-X, y = data.drop(columns=[target_variable]), data[target_variable]
+# X, y = data.drop(columns=[target_variable]), data[target_variable]
 
-
-x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=150, random_state=seed)
+# x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=150, random_state=seed)
 
 Parameter_space = x_train.copy()  # 将训练集的特征作为Parameter_space，后续从中查询样本
-
+'''
 def simulator(X_single_row):
 
     ######################## 内部忽略，就是个仿真程序的接口，输入参数X，输出目标变量y ####################################
@@ -54,16 +61,16 @@ def simulator(X_single_row):
     #################################################################################################################
 
     return y_simulated[0]
-
+'''
 
 def dataset_generation(idx_list):
 
     query_X_df = pd.DataFrame(columns=Parameter_space.columns)
-    query_y_df = pd.DataFrame(columns=[target_variable])
+    query_y_df = pd.DataFrame(columns=target_variable)
     
     for idx in idx_list:
         X = Parameter_space.loc[idx].values
-        y_sim = simulator(X)
+        y_sim = predict(X)
         # 将查询到的样本添加到查询数据集中,并且要考虑到idx这个绝对索引，不能直接append，要用loc或者iloc来添加
         query_X_df.loc[idx] = Parameter_space.loc[idx]
         query_y_df.loc[idx, target_variable] = y_sim
@@ -80,7 +87,6 @@ kernel_RBF = (
 )
 
 GP_active_learner = GaussianProcessBased(kernel=kernel_RBF, n_restarts_optimizer=15, random_state=seed)
-
 
 query_steps = 20
 query_size = 2
@@ -112,10 +118,10 @@ for step in range(query_steps+1):
 
     if step == 0:
         X_train = query_X_df.values
-        y_train = query_y_df.values.ravel()
+        y_train = query_y_df.values
     else:
         X_train = np.vstack((X_train, query_X_df.values))
-        y_train = np.hstack((y_train, query_y_df.values.ravel()))
+        y_train = np.vstack((y_train, query_y_df.values))
 
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)

@@ -1,1 +1,2 @@
 from .treebased_representativity_self import TreeBasedRegressor_Representativity_self
+from .gaussianprocess import GaussianProcessBased
