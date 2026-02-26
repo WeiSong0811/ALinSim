@@ -20,7 +20,6 @@ import time
 from .Sim_PAN import func
 import autosklearn.regression
 import os
-import time
 import gc
 import shutil
 
@@ -80,7 +79,7 @@ def data_extraction(idx, X):
 
 
 def active_learning(estimators, X_t, X_val, y_val, n_initial, n_pro_query, n_queries, threshold,
-                    initial_method="random", random_state=36, record_metrics=True):
+                    initial_method="random", random_state=36, label_idx=0, record_metrics=True):
     """
     Main active learning loop for conducting experiments.
 
@@ -119,9 +118,9 @@ def active_learning(estimators, X_t, X_val, y_val, n_initial, n_pro_query, n_que
         
         # Simple baseline model for per-round evaluation
         cur_time = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
-        tmp_dir = f"../tmp/autosklearn_{random_state}_{cur_time}"
-        if not os.path.exists(tmp_dir):
-            os.makedirs(tmp_dir)
+        tmp_dir = f"../tmp/autosklearn_{random_state}_{cur_time}_{os.getpid()}"
+        if not os.path.exists('../tmp/'):
+            os.makedirs('../tmp/')
         try:
             model = autosklearn.regression.AutoSklearnRegressor(time_left_for_this_task=900, 
                                                                 per_run_time_limit=200,
@@ -142,7 +141,8 @@ def active_learning(estimators, X_t, X_val, y_val, n_initial, n_pro_query, n_que
             return {"r2": None, "mae": None, "rmse": None}
 
         finally:
-            del model
+            if model is not None:
+                del model
             gc.collect()
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
@@ -158,10 +158,10 @@ def active_learning(estimators, X_t, X_val, y_val, n_initial, n_pro_query, n_que
         y_labeled = func(X_labeled.to_numpy(dtype=float))
         y_labeled = pd.DataFrame(y_labeled, columns=["wca", "q", "sigma"])
         # y_labeled, y_unlabeled = data_extraction(initial_idx, y_unlabeled)
-
+        y_labeled = y_labeled.iloc[:, label_idx]
         metrics = []
         if record_metrics:
-            metrics.append(eval_metrics(X_labeled, y_labeled))
+            metrics.append(eval_metrics(X_labeled, y_labeled, random_state=random_state))
 
         for _ in tqdm(range(n_queries), desc=f'{estimator.__class__.__name__} Querying', unit='query'):
             start = time.perf_counter()

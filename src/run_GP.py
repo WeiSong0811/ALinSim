@@ -20,7 +20,7 @@ def run_one(seed: int, label_idx: int, workdir: Path):
 def main():
     workdir = Path(__file__).resolve().parent
     tasks = [(seed, label_idx) for seed in range(40, 50) for label_idx in range(3)]
-    max_workers = 15
+    max_workers = 5
 
     print(f"Start {len(tasks)} tasks with {max_workers} workers...")
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
