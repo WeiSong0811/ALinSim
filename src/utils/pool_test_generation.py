@@ -103,7 +103,7 @@ def generation_pool_trc(
     #    (before validity filtering)
     # ---------------------------------------------
     # We allow side x/y to hit 0 so that "block absent" can occur.
-    param_order = ["x1", "x2", "x3", "y1", "y2", "y3"]
+    param_order = ["x_0", "x_1", "x_2", "y_0", "y_1", "y_2"]
 
     # raw LHS integerization box (inclusive integer domains)
     # x1,x3: 0..9 ; x2: 1..9
@@ -237,8 +237,8 @@ def generation_pool_trc(
     meta = {
         "param_order": param_order,
         "raw_bounds": {
-            "x1": (0, 9), "x2": (1, 9), "x3": (0, 9),
-            "y1": (0, 3), "y2": (1, 3), "y3": (0, 3),
+            "x_0": (0, 9), "x_1": (1, 9), "x_2": (0, 9),
+            "y_0": (0, 3), "y_1": (1, 3), "y_2": (0, 3),
         },
         "paper_valid_pool_count": int(X_pool_all.shape[0]),  # should be 21168
         "n_test": int(X_test.shape[0]),
@@ -258,11 +258,7 @@ def generation_pool_trc(
         print(f"Pool kept after distance filtering: {X_pool_filtered.shape[0]} / {X_pool_candidates.shape[0]}")
 
     return X_test_df, X_pool_filtered_df, meta
+for seed in [40, 41, 42, 43, 44, 45, 46, 47, 48, 49]:
+    X_test_trc, X_pool_trc, meta_trc = generation_pool_trc(seed=seed, n_test=150, delta_factor=0.5)
 
-X_test_trc, X_pool_trc, meta_trc = generation_pool_trc(seed=42, n_test=150, delta_factor=0.5)
-
-print("shape of test set:", X_test_trc.shape)
-print("shape of pool set:", X_pool_trc.shape)
-
-print("\nSample test points:")
-print(X_test_trc.head())
+    X_test_trc.to_csv(f'../data/trc_test_seed{seed}.csv', index=False)
