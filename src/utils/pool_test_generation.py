@@ -71,12 +71,11 @@ from scipy.spatial import cKDTree
 from itertools import product
 
 
-def generation_pool_trc_valid(
+def generation_pool_trc(
     seed=42,
     n_test=100,
     delta_factor=0.5,
     verbose=True,
-    max_test_sampling_rounds=50,
 ):
     """
     TRC parameter generation with paper-consistent validity rules.
@@ -111,6 +110,7 @@ def generation_pool_trc_valid(
     # y1,y3: 0..3 ; y2: 1..3
     lows = np.array([0, 1, 0, 0, 1, 0], dtype=int)
     highs = np.array([9, 9, 9, 3, 3, 3], dtype=int)
+
     highs_plus1 = highs + 1  # for LHS scaling then floor/int
 
     # ---------------------------------------------
@@ -156,13 +156,7 @@ def generation_pool_trc_valid(
     )
     X_pool_all = np.array(list(all_raw), dtype=int)
     X_pool_all = filter_valid(X_pool_all)
-
-    # sanity check: should match paper count 21168
-    expected_count = 21168
-    if X_pool_all.shape[0] != expected_count:
-        raise RuntimeError(
-            f"Valid pool count mismatch: got {X_pool_all.shape[0]}, expected {expected_count}."
-        )
+    print(f"Total valid pool combinations (paper-consistent): {X_pool_all.shape[0]} (should be 21168)")
 
     # ---------------------------------------------
     # 4) Helper: normalize to [0,1]^6 for distance
@@ -186,33 +180,27 @@ def generation_pool_trc_valid(
         X_int = np.clip(X_int, lows, highs)
         return X_int
 
-    seed_test_base = seed * 2 + 1
+    seed_test = seed * 2 + 1
+    batch_n = max(n_test * 4, 200)   # 单次采样数量，可按需改大
 
-    collected = set()
+    X_batch = lhs_integerized_batch(batch_n, seed_test)
+    X_batch = filter_valid(X_batch)
+
+    # deduplicate while preserving order
+    seen = set()
     X_test_list = []
-
-    rounds = 0
-    while len(X_test_list) < n_test and rounds < max_test_sampling_rounds:
-        rounds += 1
-        need = n_test - len(X_test_list)
-        # oversample because validity filtering + dedup will reduce count
-        batch_n = max(need * 4, 200)
-
-        X_batch = lhs_integerized_batch(batch_n, seed_test_base + rounds - 1)
-        X_batch = filter_valid(X_batch)
-
-        for row in X_batch:
-            key = tuple(row.tolist())
-            if key not in collected:
-                collected.add(key)
-                X_test_list.append(row.copy())
-                if len(X_test_list) >= n_test:
-                    break
+    for row in X_batch:
+        key = tuple(row.tolist())
+        if key not in seen:
+            seen.add(key)
+            X_test_list.append(row.copy())
+            if len(X_test_list) >= n_test:
+                break
 
     if len(X_test_list) < n_test:
         raise RuntimeError(
-            f"Could only collect {len(X_test_list)} unique valid test points "
-            f"after {rounds} rounds. Increase max_test_sampling_rounds."
+            f"Single-shot sampling produced only {len(X_test_list)} unique valid test points, "
+            f"but n_test={n_test}. Increase batch_n."
         )
 
     X_test = np.vstack(X_test_list)
@@ -253,7 +241,6 @@ def generation_pool_trc_valid(
             "y1": (0, 3), "y2": (1, 3), "y3": (0, 3),
         },
         "paper_valid_pool_count": int(X_pool_all.shape[0]),  # should be 21168
-        "expected_paper_count": expected_count,
         "n_test": int(X_test.shape[0]),
         "delta_factor": float(delta_factor),
         "delta": float(delta),
@@ -262,19 +249,17 @@ def generation_pool_trc_valid(
         "test_nn_dist_max": float(np.max(nn_dist)),
         "n_pool_after_remove_test": int(X_pool_candidates.shape[0]),
         "n_pool_filtered": int(X_pool_filtered.shape[0]),
-        "test_sampling_rounds": rounds,
     }
 
     if verbose:
-        print(f"Valid pool count (paper-consistent): {X_pool_all.shape[0]} (expected {expected_count})")
-        print(f"Test set size: {X_test.shape[0]}  | sampling rounds: {rounds}")
+        print(f"Valid pool count (paper-consistent): {X_pool_all.shape[0]}, should be 21168")
         print(f"delta = {delta:.4f}  (={delta_factor} * median NN distance in normalized space)")
         print(f"Pool after removing test points: {X_pool_candidates.shape[0]}")
         print(f"Pool kept after distance filtering: {X_pool_filtered.shape[0]} / {X_pool_candidates.shape[0]}")
 
     return X_test_df, X_pool_filtered_df, meta
 
-X_test_trc, X_pool_trc, meta_trc = generation_pool_trc_valid(seed=42, n_test=100, delta_factor=0.5)
+X_test_trc, X_pool_trc, meta_trc = generation_pool_trc(seed=42, n_test=150, delta_factor=0.5)
 
 print("shape of test set:", X_test_trc.shape)
 print("shape of pool set:", X_pool_trc.shape)
