@@ -79,7 +79,7 @@ def data_extraction(idx, X):
 
 
 def active_learning(estimators, X_t, X_val, y_val, n_initial, n_pro_query, n_queries, threshold,
-                    initial_method="random", random_state=36, record_metrics=True):
+                    initial_method="random", random_state=36, label_idx=0, record_metrics=True):
     """
     Main active learning loop for conducting experiments.
 
@@ -158,7 +158,7 @@ def active_learning(estimators, X_t, X_val, y_val, n_initial, n_pro_query, n_que
         y_labeled = func(X_labeled.to_numpy(dtype=float))
         y_labeled = pd.DataFrame(y_labeled, columns=["wca", "q", "sigma"])
         # y_labeled, y_unlabeled = data_extraction(initial_idx, y_unlabeled)
-        y_labeled = y_labeled
+        y_labeled = y_labeled.iloc[:, label_idx]
         metrics = []
         if record_metrics:
             metrics.append(eval_metrics(X_labeled, y_labeled, random_state=random_state))
@@ -180,7 +180,7 @@ def active_learning(estimators, X_t, X_val, y_val, n_initial, n_pro_query, n_que
             # y_query, y_unlabeled = data_extraction(query_idx, y_unlabeled)
             X_labeled = pd.concat([X_labeled, X_query])
             y_query = func(X_query.to_numpy(dtype=float))
-            y_query = pd.DataFrame(y_query, columns=["wca", "q", "sigma"])
+            y_query = pd.DataFrame(y_query, columns=["wca", "q", "sigma"]).iloc[:, label_idx]
             y_labeled = pd.concat([y_labeled, y_query])
             if record_metrics:
                 metrics.append(eval_metrics(X_labeled, y_labeled))

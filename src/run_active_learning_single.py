@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 import json
-from utils import data_process, data_process_meta, active_learning_auto, generation_pool, func
+from utils import data_process, data_process_meta, active_learning_auto_single , generation_pool, func
 from strategies import TreeBasedRegressor_Representativity_self
 import warnings
 # from config_loader import load_config, create_kernel
@@ -32,7 +32,7 @@ def main():
     
     parser = argparse.ArgumentParser(description="Run AutoSklearn on a specific dataset.")
     parser.add_argument("--random_state", type=int, required=True, help="Random state for fitting.")
-    # parser.add_argument("--label_idx", type=int, default=0, help="Index of the target variable to fit.")
+    parser.add_argument("--label_idx", type=int, default=0, help="Index of the target variable to fit.")
     # parser.add_argument("--initial-method", type=str, default='random', help="Initial method for active learning.")
     # parser.add_argument("--strategy-idx", type=int, required=True, help="ID of the strategy to fit.")
     # parser.add_argument("--dataset-idx", type=int, required=True, help="ID of the dataset to fit.")
@@ -43,7 +43,7 @@ def main():
     # initial_method = args.initial_method
     # strategy_num_int = args.strategy_idx
     strategy_num_int = 0
-    # label_idx = args.label_idx
+    label_idx = args.label_idx
     # datasets_num_int = args.dataset_idx
     # n_pro_query = args.n_pro_query
     n_pro_query = 2
@@ -77,7 +77,7 @@ def main():
     
     # 创建输出文件夹
     result_path = f"../result_review/"
-    result_path = os.path.join(result_path, str(random_state))
+    result_path = os.path.join(result_path, str(label_idx), str(random_state))
     
     result_time_record_path = os.path.join(result_path, 'time_record')
     if not os.path.exists(result_time_record_path):
@@ -120,8 +120,8 @@ def main():
     result_filename = f"/{estimators[strategy_num_int].__class__.__name__}"
     print(f"Result filename: {result_filename}")
     
-    query_idx_all, query_time_all, metrics_all = active_learning_auto(estimators_list, X_t, X_val, y_val, n_initial,
-                                                                       n_pro_query, n_queries, threshold,
+    query_idx_all, query_time_all, metrics_all = active_learning_auto_single(estimators_list, X_t, X_val, y_val.iloc[:, label_idx], n_initial,
+                                                                       n_pro_query, n_queries, threshold, label_idx=label_idx,
                                                                        random_state=random_state)
     
     result = query_idx_all.copy()
