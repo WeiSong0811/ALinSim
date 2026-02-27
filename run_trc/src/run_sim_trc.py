@@ -8,7 +8,7 @@ import shutil
 parser = argparse.ArgumentParser()
 parser.add_argument('-f', '--folder')
 args = parser.parse_args()
-path_to_exe= os.path.join(os.path.join('..', 'src', 'models', 'sim_trc', 'exeDir'))
+path_to_exe= os.path.join(os.path.join('..', 'src', 'exeDir'))
 REMOVE_LIST = ['fort.12', 'fort.1111', 'fort.1121', 'fort.1161', 'fort.1171', 'fort.6666']
 
 
@@ -24,6 +24,7 @@ def get_sample_dim(workdir):
 def copy_sim_files(workdir):
     shutil.copyfile(os.path.join(path_to_exe, 'Feap86.exe'), os.path.join(workdir, 'Feap86.exe'))
     shutil.copyfile(os.path.join(path_to_exe, 'iCantilever.txt'), os.path.join(workdir, 'iCantilever.txt'))
+    shutil.copyfile(os.path.join(path_to_exe, 'libiomp5md.dll'), os.path.join(workdir, 'libiomp5md.dll'))
 
 
 def del_sim_files():
