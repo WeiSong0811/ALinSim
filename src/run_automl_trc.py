@@ -12,7 +12,6 @@ def run_active_learning_with_absolute_idx(
     target_col: str,
     idx_list: list,   # 例如 [[1,5,7,9,11], [52,26], [16,87], ...]
     use_scaling: bool = True,
-    verbose: bool = True,
     step_idx: int = 0,
 ):
     """
@@ -35,20 +34,20 @@ def run_active_learning_with_absolute_idx(
             [16,87],        # 第2轮新增
             ...
         ]
-    autosklearn : object
-        具有 fit(X, y) 和 predict(X) 的回归模型（例如 AutoSklearnRegressor）
+
     use_scaling : bool
         是否进行标准化（GP/SVR/MLP建议True；树模型可False）
-    verbose : bool
-        是否打印每轮信息
+    step_idx : int
+        当前轮次索引（从0开始），决定使用 idx_list 中的哪些 idx进行训练
 
-    返回
+    输出
     ----
-    results_df : pd.DataFrame
-        每轮评估结果表
-    labeled_idx_abs : list[int]
-        最终累计已标注绝对idx
+    每轮训练结果保存为 JSON 文件，命名格式为:
+    results_{taskname}_{seed}_round{round_id}.json
+    其中 round_id 从 0 开始，表示当前轮次。
+    
     """
+
 
     # ========= 1) 读取数据 =========
     train_path = f"{taskname}_{seed}_train.csv"
