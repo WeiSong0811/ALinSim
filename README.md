@@ -72,15 +72,33 @@ GP + US
 每个步骤包括初始采样和主动学习采样步骤，都会有Metric(R2,MAE,RMSE) 做10个seed的平均
 画出来一个，plot，plot里有一个折线，X轴是数据集大小(采样次数) Y轴是 Metric。
 
-脚本逻辑：
+autosklearn的脚本逻辑：
 1. run_activelearning 获得 采样的(绝对)index。[[1,5,7,9,11],[52,26],[16,87]...]
 python run_active_learning.py --random_state $index1
 
 最后会有10个Json结果文件 名字seed_40 - seed_49
 [[],[],[],[],.....]
 
-2. run_automl 根据index获取训练集。模拟数据集越来越大，但是可以并行。
+还会产生parameter_space的csv文件 名字：{taskname}_{seed}_parameter_space.csv  包含所有的Xtrain。
+还会有一个测试集的csv 名字：{taskname}_{seed}_test.csv  包含所有的Xtest+ytest。
+最好结果文件都保存在特定的文件夹里，还要区分sim_name
+
+
+2. 根据idx列表来运行仿真
+比如 def(idx_list, seed, ):
+        Parameter_space = pd.read_csv('{taskname}_{seed}_parameter_space.csv')
+        .....
+        结果：生成一个csv，{taskname}_{seed}_train.csv 里边包含 所有被选中的样本的 绝对idx，X_train，y_train。这样后边可以通过(绝对)index列表在这个文件中选择。
+                csv里一定要有绝对idx的信息
+
+3. run_automl 根据index获取训练集。模拟数据集越来越大，但是可以并行。
 index2 = 0 1 2 3 ... 20
 python run_automl.py --random_state $index1 --sampling_steps $index2
 
+写了 .src\run_automl_trc.py 作为例子，不一定能跑通，但是逻辑差不多。你再检查一下
+
 计算平台：超算，bash脚本的array功能，纯平行。
+
+
+GP的话就可以放在一起搞了，采样+仿真+训练
+
