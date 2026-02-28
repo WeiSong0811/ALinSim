@@ -126,6 +126,7 @@ def active_learning(estimators, X_t, X_val, y_val, n_initial, n_pro_query, n_que
                                                                 per_run_time_limit=200,
                                                                 seed=random_state,
                                                                 n_jobs=-1,
+                                                                
                                                                 tmp_folder=tmp_dir)
 
             model.fit(X_labeled, y_labeled)
