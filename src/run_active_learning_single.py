@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 import json
-from utils import data_process, data_process_meta, active_learning_auto_single , generation_pool, func
+from utils import data_process, data_process_meta, active_learning_auto_single , generation_pool_pan, func
 from strategies import TreeBasedRegressor_Representativity_self
 import warnings
 # from config_loader import load_config, create_kernel
@@ -73,7 +73,7 @@ def main():
     # if not os.path.exists(f"../result/random_state_{random_state}_{initial_method}"):
     #     os.makedirs(f"../result/random_state_{random_state}_{initial_method}")
     
-    X_test, X_pool_filtered = generation_pool(seed=random_state)
+    X_test, X_pool_filtered = generation_pool_pan(seed=random_state)
     
     # 创建输出文件夹
     result_path = f"../result_review/"
