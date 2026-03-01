@@ -1,8 +1,7 @@
-model
 src_alt
 src/utils/__pycache__
 src/strategies/__pycache__
 src/utils/utils_initialize/__pycache__
 run_trc/workdir
-result_review_multi
-result_review_single
+result_multi_pan
+result_single_pan
