@@ -3,14 +3,11 @@ from scipy.stats import qmc
 from scipy.spatial import cKDTree
 import pandas as pd
 
-def generation_pool_pan(seed=42, n_test=100, n_pool=int(1e7)):
+def generation_pool_pan(seed=42, n_test=100, n_pool=int(1e5)):
     # ----- 初始设置 -----
     #seed = 42 # 跟主动学习的随机数种子保持一致
     seed_test = seed * 2 
     seed_pool = seed
-
-    n_test = 100
-    n_pool = int(1e7)
 
     param_bounds = {
         'PS:PAN ratio':(3/7, 1),

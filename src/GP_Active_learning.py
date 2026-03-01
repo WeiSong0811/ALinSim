@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score, mean_absolute_error, root_mean_squared_error
 import pandas as pd
 from strategies import GaussianProcessBased
-from utils import generation_pool, func, predict
+from utils import generation_pool_pan, func, predict
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -23,7 +23,7 @@ seed = args.random_state
 # data = pd.read_csv('data/concrete_data.csv')  # Replace with your dataset path
 # target_variable = 'concrete_compressive_strength'  # Replace with your target variable name
 target_variable = ["wca", "q", "sigma"]
-x_test, X_pool_filtered = generation_pool(seed=seed)
+x_test, X_pool_filtered = generation_pool_pan(seed=seed)
 y_test = func(x_test.to_numpy(dtype=float))
 y_test = pd.DataFrame(y_test, columns=target_variable)
 
@@ -143,7 +143,7 @@ results = {
     "rmse": rmse_list,
     "r2": r2_list
 }
-with open(f'GP_AL_results_seed_{seed}_{label_idx}.json', 'w') as f:
+with open(f'../result_review_single/GP_AL_results_seed_{seed}_{label_idx}.json', 'w') as f:
     json.dump(results, f)
 
 
