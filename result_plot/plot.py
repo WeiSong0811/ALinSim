@@ -16,19 +16,25 @@ def parse_args():
     parser.add_argument(
         "--gp-json",
         type=str,
-        default="GP_metrics_summary.json",
+        default="./pan/single/GP_metrics_summary.json",
         help="Path to GP summary JSON.",
     )
     parser.add_argument(
         "--automl-json",
         type=str,
-        default="AL_metrics_summary.json",
+        default="./pan/single/AL_metrics_summary.json",
         help="Path to AutoML summary JSON.",
+    )
+    parser.add_argument(
+        "--qbc-json",
+        type=str,
+        default="./pan/single/QBC_metrics_summary.json",
+        help="Path to QBC summary JSON for additional comparison.",
     )
     parser.add_argument(
         "--out-dir",
         type=str,
-        default="./single",
+        default="./pan/single",
         help="Directory to save output figure and merged summary.",
     )
     return parser.parse_args()
@@ -131,6 +137,7 @@ def plot_idx_metric(idx: str, metric: str, series_map: dict, out_path: Path):
     colors = {
         "GP": "tab:blue",
         "AutoML": "tab:orange",
+        "QBC": "tab:green",
     }
 
     for name, idx_data in series_map.items():
@@ -153,6 +160,7 @@ def main():
     args = parse_args()
     gp_path = Path(args.gp_json).resolve()
     automl_path = Path(args.automl_json).resolve()
+    qbc_path = Path(args.qbc_json).resolve()
     out_dir = Path(args.out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -160,16 +168,20 @@ def main():
         gp_payload = json.load(f)
     with automl_path.open("r", encoding="utf-8") as f:
         automl_payload = json.load(f)
-
+    with qbc_path.open("r", encoding="utf-8") as f:
+        qbc_payload = json.load(f)
     gp_by_idx = load_idx_results(gp_payload)
     automl_by_idx = load_idx_results(automl_payload)
-    all_idx = sorted(set(gp_by_idx.keys()) | set(automl_by_idx.keys()), key=lambda x: int(x))
+    qbc_by_idx = load_idx_results(qbc_payload)
+
+    all_idx = sorted(set(gp_by_idx.keys()) | set(automl_by_idx.keys()) | set(qbc_by_idx.keys()), key=lambda x: int(x))
 
     merged = {
         "gp": gp_by_idx,
         "automl": automl_by_idx,
+        "qbc": qbc_by_idx,
     }
-    merged_json = out_dir / "GP_vs_AutoML.json"
+    merged_json = out_dir / "GP_vs_AutoML_vs_QBC.json"
     with merged_json.open("w", encoding="utf-8") as f:
         json.dump(merged, f, ensure_ascii=False, indent=2)
 
@@ -181,9 +193,11 @@ def main():
                 series_map["GP"] = gp_by_idx[idx]
             if idx in automl_by_idx:
                 series_map["AutoML"] = automl_by_idx[idx]
+            if idx in qbc_by_idx:
+                series_map["QBC"] = qbc_by_idx[idx]
             if not series_map:
                 continue
-            fig_path = out_dir / f"GP_vs_AutoML_idx_{idx}_{metric}.png"
+            fig_path = out_dir / f"GP_vs_AutoML_vs_QBC_idx_{idx}_{metric}.png"
             plot_idx_metric(idx, metric, series_map, fig_path)
             saved.append(fig_path)
 

@@ -3,7 +3,7 @@ from sklearn.ensemble import RandomForestRegressor
 from xgboost import XGBRegressor
 
 
-class QueryByCommittee_PaperStyle:
+class QBC_Paper:
     """
     Paper-style QBC for single-output regression only
     Committee = {RF, XGB}

@@ -163,7 +163,7 @@ results = {
 }
 
 
-with open(f'../result_review_single/QBC_AL_PAN_results_seed_{seed}_{label_idx}.json', 'w') as f:
+with open(f'../result_single_pan/QBC_AL_PAN_results_seed_{seed}_{label_idx}.json', 'w') as f:
     json.dump(results, f)
 
 

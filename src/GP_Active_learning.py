@@ -143,7 +143,7 @@ results = {
     "rmse": rmse_list,
     "r2": r2_list
 }
-with open(f'../result_review_single/GP_AL_results_seed_{seed}_{label_idx}.json', 'w') as f:
+with open(f'../result_single_pan/GP_AL_results_seed_{seed}_{label_idx}.json', 'w') as f:
     json.dump(results, f)
 
 
