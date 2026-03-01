@@ -23,6 +23,7 @@ SVM（RBF核）+ GS/IGS: Exploring active learning strategies for predictive mod
 SVR + Enhanced Query-by-Committee : Applying enhanced active learning to predict formation energy
 RF + XGB + QBC（Query-by-Committee）: Exploiting redundancy in large materials datasets for efficient machine learning with less data
 NN + Query-by-Committee: Active learning and element-embedding approach in neural networks for infinite-layer versus perovskite oxides
+QBC经典：Active Learning for Regression Based on Query by Committee
 
 GBR+ Query-by-Committee(SVR（Support Vector Regression）+ GBR（Gradient Boosting Regression）+ FR（Random Forest Regression）+ ABR（AdaBoost Regression）+ KRR（Kernel Ridge Regression）): Active learning for the power factor prediction in diamond-like thermoelectric materials
 
@@ -51,22 +52,28 @@ GBR+ Query-by-Committee(SVR（Support Vector Regression）+ GBR（Gradient Boost
 
 2. 对照试验设计：
 
-pan仿真
+    pan仿真
 
-seed 40-50 10seed
+    seed 40-50 10seed
 
-参数空间 每个维度10个样本
+    参数空间 每个维度10个样本
 
-测试集使用拉丁超立方采样100，采样之后要把100个删掉 
+    测试集使用拉丁超立方采样100，采样之后要把100个删掉 
 
-初始采样 从(参数空间-100)中随机采样 5个 
+    初始采样 从(参数空间-100)中随机采样 5个 
 
-主动学习采样，每次采样 2个 采样20
+    主动学习采样，每次采样 2个 采样20
 
-策略：
-autosklearn(RF) + treebased_representativity_self.py  先做这个
+要做的策略：
 
-GP + US
+
+    autosklearn(RF) + treebased_representativity_self.py
+
+    GP + US: ./src/GP_Active_learning.py
+
+    XGB + qbc：XGB(超参数用qbc_paper.py中的xgb超参数) + ./src/strategies/qbc_paper.py
+
+
 
 结果处理：
 每个步骤包括初始采样和主动学习采样步骤，都会有Metric(R2,MAE,RMSE) 做10个seed的平均

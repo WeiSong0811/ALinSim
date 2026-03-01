@@ -1,2 +1,3 @@
 from .treebased_representativity_self import TreeBasedRegressor_Representativity_self
 from .gaussianprocess import GaussianProcessBased
+from .qbc_paper import QBC_Paper
