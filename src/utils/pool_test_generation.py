@@ -2,6 +2,7 @@ import numpy as np
 from scipy.stats import qmc
 from scipy.spatial import cKDTree
 import pandas as pd
+from itertools import product
 
 def generation_pool_pan(seed=42, n_test=100, n_pool=int(1e5)):
     # ----- 初始设置 -----
@@ -60,12 +61,6 @@ def generation_pool_pan(seed=42, n_test=100, n_pool=int(1e5)):
     X_pool_filtered = pd.DataFrame(X_pool_filtered, columns=param_order)
 
     return X_test, X_pool_filtered
-
-import numpy as np
-import pandas as pd
-from scipy.stats import qmc
-from scipy.spatial import cKDTree
-from itertools import product
 
 
 def generation_pool_trc(
@@ -255,7 +250,170 @@ def generation_pool_trc(
         print(f"Pool kept after distance filtering: {X_pool_filtered.shape[0]} / {X_pool_candidates.shape[0]}")
 
     return X_test_df, X_pool_filtered_df, meta
-for seed in [40, 41, 42, 43, 44, 45, 46, 47, 48, 49]:
-    X_test_trc, X_pool_trc, meta_trc = generation_pool_trc(seed=seed, n_test=150, delta_factor=0.5)
+# for seed in [40, 41, 42, 43, 44, 45, 46, 47, 48, 49]:
+#    X_test_trc, X_pool_trc, meta_trc = generation_pool_trc(seed=seed, n_test=150, delta_factor=0.5)
+#
+#    X_test_trc.to_csv(f'../data/trc_test_seed{seed}.csv', index=False)
 
-    X_test_trc.to_csv(f'../data/trc_test_seed{seed}.csv', index=False)
+
+def generation_pool_fea(
+    seed=42,
+    n_test=100,
+    delta_factor=0.5,
+    verbose=True,
+):
+    """
+    FEA parameter generation with paper-consistent validity rules.
+
+    Rules (from paper):
+    - Center block (2) must exist
+    - Side blocks (1,3) may not exist
+    - If x_i == 0, then y_i == 0
+    - If block exists, x_i in {1..9}, y_i in {1..3}
+    - Center block always exists: x2 in {1..9}, y2 in {1..3}
+
+    Test set:
+    - sampled by paper-like integerized LHS, then filtered to valid combinations
+    - continues sampling rounds until enough unique valid test points are collected
+
+    Pool:
+    - all valid discrete combinations (should be exactly 21168)
+
+    Filtering:
+    - remove pool points too close to test points in normalized [0,1]^6 space
+    """
+
+    # ---------------------------------------------
+    # 1) Parameter definition for "raw" integerized LHS box
+    #    (before validity filtering)
+    # ---------------------------------------------
+    # We allow side x/y to hit 0 so that "block absent" can occur.
+    param_order = ["d", "h/d", "b", "E", "ll", "sdl"]
+
+    # raw LHS integerization box (inclusive integer domains)
+    lows = np.array([100, 1, 1000, 24000, -5.0, -1.5], dtype=float)
+    highs = np.array([250, 2.25, 5000, 42200, -1.5, 0], dtype=float)
+
+    highs_plus1 = highs + 1  # for LHS scaling then floor/int
+
+    # ---------------------------------------------
+    # 3) Build ALL valid pool combinations (exact space)
+    # ---------------------------------------------
+    all_raw = product(
+        [100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240, 250],   # d
+        [1.0, 1.25, 1.5, 1.75, 2.0, 2.25],   # h/d
+        [1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000],   # b
+        [24000, 26700, 30100, 32800, 34800, 37400, 39600, 42200],    # E
+        [-1.5, -2.0, -2.5, -3.0, -3.5, -4.0, -5.0],    # ll
+        [0, -0.25, -1.0, -1.25, -1.5],    # sdl
+    )
+
+    X_pool_all = np.array(list(all_raw), dtype=float)
+  
+    print(f"Total valid pool combinations (paper-consistent): {X_pool_all.shape[0]} (should be 21168)")
+
+    # ---------------------------------------------
+    # 4) Helper: normalize to [0,1]^6 for distance
+    # ---------------------------------------------
+    # use raw integer box normalization (same coordinate system for test/pool)
+    def to_unit_cube(X_int):
+        X = np.asarray(X_int, dtype=float)
+        span = (highs - lows).astype(float)
+        span[span == 0] = 1.0
+        return (X - lows) / span
+
+    # ---------------------------------------------
+    # 5) Paper-style test sampling:
+    #    LHS -> scale -> int -> valid-filter -> dedup until n_test reached
+    # ---------------------------------------------
+    def lhs_integerized_batch(n, seed_local):
+        sampler = qmc.LatinHypercube(d=6, seed=seed_local)
+        X01 = sampler.random(n)
+        X_scaled = qmc.scale(X01, lows.astype(float), highs_plus1.astype(float))
+        X_int = X_scaled.astype(float)  # floor
+        X_int = np.clip(X_int, lows, highs)
+        return X_int
+
+    seed_test = seed * 2 + 1
+    batch_n = max(n_test * 4, 200)   # 单次采样数量，可按需改大
+
+    X_batch = lhs_integerized_batch(batch_n, seed_test)
+
+    # deduplicate while preserving order
+    seen = set()
+    X_test_list = []
+    for row in X_batch:
+        key = tuple(row.tolist())
+        if key not in seen:
+            seen.add(key)
+            X_test_list.append(row.copy())
+            if len(X_test_list) >= n_test:
+                break
+
+    if len(X_test_list) < n_test:
+        raise RuntimeError(
+            f"Single-shot sampling produced only {len(X_test_list)} unique valid test points, "
+            f"but n_test={n_test}. Increase batch_n."
+        )
+
+    X_test = np.vstack(X_test_list)
+
+    # ---------------------------------------------
+    # 6) Compute delta from test NN distances (normalized space)
+    # ---------------------------------------------
+    X_test01 = to_unit_cube(X_test)
+    tree_test = cKDTree(X_test01)
+    d_nn, _ = tree_test.query(X_test01, k=2)  # self + nearest other
+    nn_dist = d_nn[:, 1]
+    delta = float(delta_factor * np.median(nn_dist))
+
+    # ---------------------------------------------
+    # 7) Filter pool:
+    #    - remove test points themselves
+    #    - remove points too close to test
+    # ---------------------------------------------
+    test_set = set(map(tuple, X_test.tolist()))
+    mask_not_test = np.array([tuple(row) not in test_set for row in X_pool_all], dtype=bool)
+    X_pool_candidates = X_pool_all[mask_not_test]
+
+    X_pool01 = to_unit_cube(X_pool_candidates)
+    dist_to_test, _ = tree_test.query(X_pool01, k=1)
+    mask_far = dist_to_test >= delta
+    X_pool_filtered = X_pool_candidates[mask_far]
+
+    # ---------------------------------------------
+    # 8) Return DataFrames + metadata
+    # ---------------------------------------------
+    X_test_df = pd.DataFrame(X_test, columns=param_order)
+    X_pool_filtered_df = pd.DataFrame(X_pool_filtered, columns=param_order)
+
+    meta = {
+        "param_order": param_order,
+        "raw_bounds": {
+            "d": (100, 250), "d_h": (1, 2.25), "b": (1000, 5000),
+            "E": (24000, 42200), "ll": (-5.0, -1.5), "sdl": (-1.5, 0),
+        },
+        "paper_valid_pool_count": int(X_pool_all.shape[0]),  # should be 21168
+        "n_test": int(X_test.shape[0]),
+        "delta_factor": float(delta_factor),
+        "delta": float(delta),
+        "test_nn_dist_median": float(np.median(nn_dist)),
+        "test_nn_dist_min": float(np.min(nn_dist)),
+        "test_nn_dist_max": float(np.max(nn_dist)),
+        "n_pool_after_remove_test": int(X_pool_candidates.shape[0]),
+        "n_pool_filtered": int(X_pool_filtered.shape[0]),
+    }
+
+    if verbose:
+        print(f"Valid pool count (paper-consistent): {X_pool_all.shape[0]}, should be 21168")
+        print(f"delta = {delta:.4f}  (={delta_factor} * median NN distance in normalized space)")
+        print(f"Pool after removing test points: {X_pool_candidates.shape[0]}")
+        print(f"Pool kept after distance filtering: {X_pool_filtered.shape[0]} / {X_pool_candidates.shape[0]}")
+
+    return X_test_df, X_pool_filtered_df, meta
+
+X_test_fea, _, _ = generation_pool_fea(seed=42, n_test=100, delta_factor=0.5, verbose=True)
+
+for seed in [40, 41, 42, 43, 44, 45, 46, 47, 48, 49]:
+    X_test_fea, X_pool_fea, meta_fea = generation_pool_fea(seed=seed, n_test=150, delta_factor=0.5)
+    X_test_fea.to_csv(f'../data/fea_test_{seed}.csv', index=False)
