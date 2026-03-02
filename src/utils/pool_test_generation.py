@@ -3,6 +3,7 @@ from scipy.stats import qmc
 from scipy.spatial import cKDTree
 import pandas as pd
 from itertools import product
+from tqdm import tqdm
 
 def generation_pool_pan(seed=42, n_test=100, n_pool=int(1e5)):
     # ----- 初始设置 -----
@@ -259,28 +260,21 @@ def generation_pool_trc(
 def generation_pool_fea(
     seed=42,
     n_test=100,
+    n_pool=None,
     delta_factor=0.5,
     verbose=True,
 ):
     """
     FEA parameter generation with paper-consistent validity rules.
+    
+    parameters:
+    seed : int
+    n_test : int
+    delta_factor : float
+        距离过滤的 delta 是 test 内部最近邻距离中位数的多少倍，建议 0.5~1.0
 
-    Rules (from paper):
-    - Center block (2) must exist
-    - Side blocks (1,3) may not exist
-    - If x_i == 0, then y_i == 0
-    - If block exists, x_i in {1..9}, y_i in {1..3}
-    - Center block always exists: x2 in {1..9}, y2 in {1..3}
-
-    Test set:
-    - sampled by paper-like integerized LHS, then filtered to valid combinations
-    - continues sampling rounds until enough unique valid test points are collected
-
-    Pool:
-    - all valid discrete combinations (should be exactly 21168)
-
-    Filtering:
-    - remove pool points too close to test points in normalized [0,1]^6 space
+    verbose : bool
+        是否打印详细信息
     """
 
     # ---------------------------------------------
@@ -290,73 +284,113 @@ def generation_pool_fea(
     # We allow side x/y to hit 0 so that "block absent" can occur.
     param_order = ["d", "h/d", "b", "E", "ll", "sdl"]
 
-    # raw LHS integerization box (inclusive integer domains)
-    lows = np.array([100, 1, 1000, 24000, -5.0, -1.5], dtype=float)
-    highs = np.array([250, 2.25, 5000, 42200, -1.5, 0], dtype=float)
-
-    highs_plus1 = highs + 1  # for LHS scaling then floor/int
-
+    seed_test = seed
+    seed_pool = seed * 2 + 1
     # ---------------------------------------------
     # 3) Build ALL valid pool combinations (exact space)
     # ---------------------------------------------
-    all_raw = product(
-        [100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240, 250],   # d
-        [1.0, 1.25, 1.5, 1.75, 2.0, 2.25],   # h/d
-        [1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000],   # b
-        [24000, 26700, 30100, 32800, 34800, 37400, 39600, 42200],    # E
-        [-1.5, -2.0, -2.5, -3.0, -3.5, -4.0, -5.0],    # ll
-        [0, -0.25, -1.0, -1.25, -1.5],    # sdl
-    )
+    grid = {
+        "d":   np.array([100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240, 250], dtype=float),
+        "h/d": np.array([1.0, 1.25, 1.5, 1.75, 2.0, 2.25], dtype=float),
+        "b":   np.array([1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000], dtype=float),
+        "E":   np.array([24000, 26700, 30100, 32800, 34800, 37400, 39600, 42200], dtype=float),
+        "ll":  np.array([-1.5, -2.0, -2.5, -3.0, -3.5, -4.0, -5.0], dtype=float),
+        "sdl": np.array([0.0, -0.25, -0.5, -1.0, -1.25, -1.5], dtype=float),
+    }
+
+    # 为了归一化方便，记录每个维度的 min/max（注意 ll/sdl 是降序列表，也没关系）
+    lows = np.array([grid[p].min() for p in param_order], dtype=float)  # [100, 1.0, 1000, 24000, -5.0, -1.5]
+    highs = np.array([grid[p].max() for p in param_order], dtype=float) # [250, 2.25, 5000, 42200, -1.5, 0.0]
+
+    n_levels = np.array([len(grid[p]) for p in param_order], dtype=int)
+
+    all_raw = product(*(grid[p] for p in param_order))
 
     X_pool_all = np.array(list(all_raw), dtype=float)
-  
-    print(f"Total valid pool combinations (paper-consistent): {X_pool_all.shape[0]} (should be 21168)")
 
-    # ---------------------------------------------
-    # 4) Helper: normalize to [0,1]^6 for distance
-    # ---------------------------------------------
-    # use raw integer box normalization (same coordinate system for test/pool)
-    def to_unit_cube(X_int):
-        X = np.asarray(X_int, dtype=float)
-        span = (highs - lows).astype(float)
+    total_pool_count = X_pool_all.shape[0]
+
+    if verbose:
+        print(f"Total pool combinations (discrete grid): {total_pool_count}")
+
+    def to_unit_cube(X):
+        X = np.asarray(X, dtype=float)
+        span = highs - lows
         span[span == 0] = 1.0
         return (X - lows) / span
+
+    def farthest_point_subsample(X01, n_keep, seed=42):
+        """
+        Greedy farthest point sampling on normalized space X01 (N, d).
+        Returns selected indices (length n_keep).
+        """
+        X01 = np.asarray(X01, dtype=float)
+        N = X01.shape[0]
+
+        if n_keep >= N:
+            return np.arange(N, dtype=int)
+        if n_keep <= 0:
+            raise ValueError("n_keep must be >= 1")
+
+        rng = np.random.default_rng(seed)
+
+        selected = np.empty(n_keep, dtype=int)
+
+        # 随机起点（可复现）
+        first = int(rng.integers(0, N))
+        selected[0] = first
+
+        # 每个点到“已选集合”的最小距离平方（初始化为到第一个点）
+        diff = X01 - X01[first]
+        min_dist2 = np.einsum("ij,ij->i", diff, diff)
+        min_dist2[first] = -1.0  # 标记已选
+
+        for i in tqdm(range(1, n_keep), desc="FPS subsampling", leave=False):
+            nxt = int(np.argmax(min_dist2))
+            selected[i] = nxt
+
+            diff = X01 - X01[nxt]
+            dist2 = np.einsum("ij,ij->i", diff, diff)
+
+            min_dist2 = np.minimum(min_dist2, dist2)
+            min_dist2[selected[:i+1]] = -1.0  # 已选点不再参与
+
+        return selected
 
     # ---------------------------------------------
     # 5) Paper-style test sampling:
     #    LHS -> scale -> int -> valid-filter -> dedup until n_test reached
     # ---------------------------------------------
-    def lhs_integerized_batch(n, seed_local):
-        sampler = qmc.LatinHypercube(d=6, seed=seed_local)
-        X01 = sampler.random(n)
-        X_scaled = qmc.scale(X01, lows.astype(float), highs_plus1.astype(float))
-        X_int = X_scaled.astype(float)  # floor
-        X_int = np.clip(X_int, lows, highs)
-        return X_int
+    def lhs_discrete_batch(n, seed_local):
+        """
+        For each dimension j with m levels:
+        - sample u in [0,1)
+        - idx = floor(u * m) in {0, ..., m-1}
+        - map idx -> discrete value grid[param][idx]
+        """
+        sampler = qmc.LatinHypercube(d=len(param_order), seed=seed_local)
+        U = sampler.random(n)  # shape (n, 6), values in [0,1)
 
-    seed_test = seed * 2 + 1
-    batch_n = max(n_test * 4, 200)   # 单次采样数量，可按需改大
+        # index matrix
+        idx = np.floor(U * n_levels).astype(int)
+        # 数值安全（理论上 U<1，不会越界，但clip更稳）
+        idx = np.clip(idx, 0, n_levels - 1)
 
-    X_batch = lhs_integerized_batch(batch_n, seed_test)
+        # map to actual discrete parameter values
+        X = np.empty((n, len(param_order)), dtype=float)
+        for j, p in enumerate(param_order):
+            X[:, j] = grid[p][idx[:, j]]
+        return X
 
-    # deduplicate while preserving order
-    seen = set()
-    X_test_list = []
-    for row in X_batch:
-        key = tuple(row.tolist())
-        if key not in seen:
-            seen.add(key)
-            X_test_list.append(row.copy())
-            if len(X_test_list) >= n_test:
-                break
+    X_test = lhs_discrete_batch(n_test, seed_test)
 
-    if len(X_test_list) < n_test:
+    # 可选：仍然做一次去重检查（建议保留）
+    if len({tuple(row.tolist()) for row in X_test}) < n_test:
         raise RuntimeError(
-            f"Single-shot sampling produced only {len(X_test_list)} unique valid test points, "
-            f"but n_test={n_test}. Increase batch_n."
+            "LHS sampling produced duplicate test points. "
+            "For this seed/n_test, please use a different seed or add a small oversampling factor."
         )
 
-    X_test = np.vstack(X_test_list)
 
     # ---------------------------------------------
     # 6) Compute delta from test NN distances (normalized space)
@@ -373,7 +407,7 @@ def generation_pool_fea(
     #    - remove points too close to test
     # ---------------------------------------------
     test_set = set(map(tuple, X_test.tolist()))
-    mask_not_test = np.array([tuple(row) not in test_set for row in X_pool_all], dtype=bool)
+    mask_not_test = np.array([tuple(row.tolist()) not in test_set for row in X_pool_all], dtype=bool)
     X_pool_candidates = X_pool_all[mask_not_test]
 
     X_pool01 = to_unit_cube(X_pool_candidates)
@@ -382,18 +416,40 @@ def generation_pool_fea(
     X_pool_filtered = X_pool_candidates[mask_far]
 
     # ---------------------------------------------
+    # 7.5) Optional: limit pool size with FPS
+    # ---------------------------------------------
+    
+    pool_subsample_method = "fps"   # 目前用 fps
+
+    n_pool_before_subsample = X_pool_filtered.shape[0]
+
+    if n_pool is not None and n_pool_before_subsample > n_pool:
+        if pool_subsample_method == "fps":
+            X_pool_filtered01 = to_unit_cube(X_pool_filtered)
+            sel_idx = farthest_point_subsample(
+                X_pool_filtered01,
+                n_keep=n_pool,
+                seed=seed_pool,
+            )
+            X_pool_filtered = X_pool_filtered[sel_idx]
+        else:
+            raise ValueError(f"Unknown pool_subsample_method: {pool_subsample_method}")
+    else:
+        # 没有限量或本来就不超，保留原数
+        n_pool_before_subsample = X_pool_filtered.shape[0]
+        
+    # ---------------------------------------------
     # 8) Return DataFrames + metadata
     # ---------------------------------------------
     X_test_df = pd.DataFrame(X_test, columns=param_order)
     X_pool_filtered_df = pd.DataFrame(X_pool_filtered, columns=param_order)
 
+    
     meta = {
         "param_order": param_order,
-        "raw_bounds": {
-            "d": (100, 250), "d_h": (1, 2.25), "b": (1000, 5000),
-            "E": (24000, 42200), "ll": (-5.0, -1.5), "sdl": (-1.5, 0),
-        },
-        "paper_valid_pool_count": int(X_pool_all.shape[0]),  # should be 21168
+        "grid_sizes": {p: int(len(grid[p])) for p in param_order},
+        "raw_bounds": {p: (float(grid[p].min()), float(grid[p].max())) for p in param_order},
+        "pool_total_count": int(X_pool_all.shape[0]),   # expected 36288 for current grid
         "n_test": int(X_test.shape[0]),
         "delta_factor": float(delta_factor),
         "delta": float(delta),
@@ -405,15 +461,15 @@ def generation_pool_fea(
     }
 
     if verbose:
-        print(f"Valid pool count (paper-consistent): {X_pool_all.shape[0]}, should be 21168")
-        print(f"delta = {delta:.4f}  (={delta_factor} * median NN distance in normalized space)")
+        print(f"Pool total count: {X_pool_all.shape[0]}")
+        print(f"delta = {delta:.4f} (={delta_factor} * median NN distance in normalized space)")
         print(f"Pool after removing test points: {X_pool_candidates.shape[0]}")
         print(f"Pool kept after distance filtering: {X_pool_filtered.shape[0]} / {X_pool_candidates.shape[0]}")
 
     return X_test_df, X_pool_filtered_df, meta
 
-X_test_fea, _, _ = generation_pool_fea(seed=42, n_test=100, delta_factor=0.5, verbose=True)
+# X_test_fea, _, _ = generation_pool_fea(seed=42, n_test=100, delta_factor=0.5, verbose=True)
 
-for seed in [40, 41, 42, 43, 44, 45, 46, 47, 48, 49]:
-    X_test_fea, X_pool_fea, meta_fea = generation_pool_fea(seed=seed, n_test=150, delta_factor=0.5)
-    X_test_fea.to_csv(f'../data/fea_test_{seed}.csv', index=False)
+for seed in [40]: # [40, 41, 42, 43, 44, 45, 46, 47, 48, 49]
+    X_test_fea, X_pool_fea, meta_fea = generation_pool_fea(seed=seed, n_test=150, delta_factor=0.5, verbose=True, n_pool=100000)
+    # X_test_fea.to_csv(f'../data/fea_test_{seed}.csv', index=False)

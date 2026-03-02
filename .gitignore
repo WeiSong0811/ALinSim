@@ -5,3 +5,5 @@ src/utils/utils_initialize/__pycache__
 run_trc/workdir
 result_multi_pan
 result_single_pan
+.vscode
+__pycache__
