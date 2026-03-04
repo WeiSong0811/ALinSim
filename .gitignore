@@ -7,3 +7,5 @@ result_multi_pan
 result_single_pan
 .vscode
 __pycache__
+data
+src/fea/output_fea

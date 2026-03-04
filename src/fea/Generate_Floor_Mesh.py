@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
-from Engineering_Formulas import *;
-from Geometric_Function import *;
+from .Engineering_Formulas import *;
+from .Geometric_Function import *;
+import os;
+import tempfile;
 
 def read_text_file(file_name):
     #Intiate the global freedoms
@@ -94,7 +96,7 @@ def read_text_file(file_name):
         elif(line_id[0].upper()=='MATERIAL'):
             mat_name,E,poisson,density=line_id[1].split(',');
             mat_name='CONC_'+mat_name;
-            E=int(E);
+            E=round(float(E),3);
             poisson=round(float(poisson),3);
             density=round(float(density),3);
             materials[mat_name]={
@@ -102,7 +104,7 @@ def read_text_file(file_name):
                 'Poisson':poisson,
                 'density':density,
                 };
-        elif(line_id[0].upper=='ORIENTATION'):
+        elif(line_id[0].upper()=='ORIENTATION'):
             des_ori,des_ang=line_id[1].split(',');
             des_ang=round(float(des_ang),3);
             if(des_ori.upper()=='LATITUDE'):
@@ -312,6 +314,88 @@ def read_text_file(file_name):
                 
     return (nodes,elements,sections,materials,global_freedoms,load_cases,
             load_combos,criteria,mesh_input,area_loads,node_loads);
+
+def _combo_to_text(case_name, factors):
+    combo_items=[];
+    for case,factor in factors:
+        combo_items+=['({},{})'.format(case,float(factor))];
+    return 'LOAD COMBO,{},({})'.format(case_name,','.join(combo_items));
+
+def parameters_to_input_text_lines(params):
+    """
+    Build solver input text lines from a parameter dictionary.
+
+    Required keys:
+        slab: {'points': [(x1,y1),...], 'thk': int, 'grade': int}
+        material: {'name': int|str, 'E': float|int, 'poisson': float, 'density': float}
+        load_cases: [{'name': str, 'type': str}, ...]
+        loadings: [{'case': str, 'gravity': True} or
+                   {'case': str, 'loading': float, 'areas': 'ALL'}, ...]
+        load_combos: [{'name': str, 'factors': [(case, factor), ...]}, ...]
+
+    Optional keys:
+        slab.toc (default 0), slab.priority (default 1)
+        supports: [(x,y), ...]
+        orientation: {'latitude': float, 'longitude': float}
+        mesh_size: float (default 250)
+    """
+    slab=params['slab'];
+    material=params['material'];
+    load_cases=params['load_cases'];
+    loadings=params['loadings'];
+    load_combos=params['load_combos'];
+    supports=params.get('supports',[]);
+    orientation=params.get('orientation',{'latitude':0,'longitude':90});
+    mesh_size=params.get('mesh_size',250.0);
+
+    toc=slab.get('toc',0);
+    priority=slab.get('priority',1);
+    slab_points=tuple((float(pt[0]),float(pt[1])) for pt in slab['points']);
+
+    lines=[];
+    lines+=['MESH,SLAB,{},{},{},{},{}'.format(
+        slab_points,int(slab['thk']),int(slab['grade']),int(toc),int(priority)
+    )];
+
+    for sx,sy in supports:
+        lines+=['MESH,PT SUPPORT,{},{}'.format(float(sx),float(sy))];
+
+    lines+=['MATERIAL,{},{},{},{}'.format(
+        material['name'],material['E'],material['poisson'],material['density']
+    )];
+    lines+=['ORIENTATION,LATITUDE,{}'.format(orientation.get('latitude',0))];
+    lines+=['ORIENTATION,LONGITUDE,{}'.format(orientation.get('longitude',90))];
+    lines+=['MESH SIZE,{}'.format(float(mesh_size))];
+
+    for case in load_cases:
+        lines+=['LOAD CASE,{},{}'.format(case['name'],case['type'])];
+
+    for ld in loadings:
+        if(ld.get('gravity',False)==True):
+            lines+=['LOADING,{},GRAVITY'.format(ld['case'])];
+        else:
+            areas=str(ld.get('areas','ALL')).upper();
+            lines+=['LOADING,{},{},{}'.format(ld['case'],float(ld['loading']),areas)];
+
+    for combo in load_combos:
+        lines+=[_combo_to_text(combo['name'],combo['factors'])];
+
+    return lines;
+
+def read_parameters(params):
+    """
+    Direct parameter interface. No user-managed txt file is required.
+    """
+    lines=parameters_to_input_text_lines(params);
+    tmp_path=None;
+    try:
+        with tempfile.NamedTemporaryFile(mode='w',suffix='.txt',delete=False) as tmp:
+            tmp.write('\n'.join(lines));
+            tmp_path=tmp.name;
+        return read_text_file(tmp_path);
+    finally:
+        if(tmp_path is not None and os.path.exists(tmp_path)):
+            os.remove(tmp_path);
 
 if(__name__=='__main__'):
     #Get the filename to be imported
