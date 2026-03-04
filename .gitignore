@@ -9,3 +9,5 @@ result_single_pan
 __pycache__
 
 src/fea/output_fea
+run_trc/predicted_datasets
+run_trc/src/__pycache__

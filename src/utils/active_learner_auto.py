@@ -17,11 +17,13 @@ from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 from tqdm import tqdm
 from .initialize import initialize
 import time
-from .Sim_PAN import func
+# from .Sim_PAN import func
 import autosklearn.regression
 import os
 import gc
 import shutil
+from fea import run_fea
+
 
 class RandomSearch:
     """
@@ -155,10 +157,15 @@ def active_learning(estimators, X_t, X_val, y_val, n_initial, n_pro_query, n_que
 
         idx_batch.append(initial_idx)
         X_labeled, X_unlabeled = data_extraction(initial_idx, X_unlabeled)
-        y_labeled = func(X_labeled.to_numpy(dtype=float))
-        y_labeled = pd.DataFrame(y_labeled, columns=["wca", "q", "sigma"])
-        # y_labeled, y_unlabeled = data_extraction(initial_idx, y_unlabeled)
-        y_labeled = y_labeled
+        X_labeled_np = X_labeled.to_numpy(dtype=float)
+        y_vals = []
+        for row in X_labeled_np:
+            y = run_fea(row)
+            y_vals.append(float(y))
+
+        y_labeled = pd.DataFrame({"max_uz": y_vals}, index=X_labeled.index)
+
+
         metrics = []
         if record_metrics:
             metrics.append(eval_metrics(X_labeled, y_labeled, random_state=random_state))
@@ -179,9 +186,13 @@ def active_learning(estimators, X_t, X_val, y_val, n_initial, n_pro_query, n_que
             X_query, X_unlabeled = data_extraction(query_idx, X_unlabeled)
             # y_query, y_unlabeled = data_extraction(query_idx, y_unlabeled)
             X_labeled = pd.concat([X_labeled, X_query])
-            y_query = func(X_query.to_numpy(dtype=float))
-            y_query = pd.DataFrame(y_query, columns=["wca", "q", "sigma"])
+            y_vals_query = []
+            for row in X_query.to_numpy(dtype=float):
+                y = run_fea(row)
+                y_vals_query.append(float(y))
+            y_query = pd.DataFrame({"max_uz": y_vals_query}, index=X_query.index)
             y_labeled = pd.concat([y_labeled, y_query])
+
             if record_metrics:
                 metrics.append(eval_metrics(X_labeled, y_labeled))
 
