@@ -162,8 +162,11 @@ def active_learning(estimators, X_t, X_val, y_val, n_initial, n_pro_query, n_que
             X_query, X_unlabeled = data_extraction(query_idx, X_unlabeled)
             # y_query, y_unlabeled = data_extraction(query_idx, y_unlabeled)
             X_labeled = pd.concat([X_labeled, X_query])
-            y_query = run_fea(X_query.to_numpy(dtype=float))
-            y_query = pd.DataFrame(y_query, columns=["wca", "q", "sigma"])
+            y_vals_query = []
+            for row in X_query.to_numpy(dtype=float):
+                y = run_fea(row)
+                y_vals_query.append(float(y))
+            y_query = pd.DataFrame({"max_uz": y_vals_query}, index=X_query.index)
             y_labeled = pd.concat([y_labeled, y_query])
             if record_metrics:
                 metrics.append(eval_metrics(X_labeled, y_labeled))

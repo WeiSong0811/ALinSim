@@ -72,7 +72,7 @@ def main():
     # if not os.path.exists(f"../result/random_state_{random_state}_{initial_method}"):
     #     os.makedirs(f"../result/random_state_{random_state}_{initial_method}")
     
-    X_test, X_pool_filtered,_ = generation_pool_fea(seed=random_state)
+    X_test, X_pool_filtered,_ = generation_pool_fea(seed=random_state, n_pool=10000)
     
     # 创建输出文件夹
     result_path = f"../result_single_fea/"

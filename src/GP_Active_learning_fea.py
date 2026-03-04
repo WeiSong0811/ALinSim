@@ -24,7 +24,7 @@ seed = args.random_state
 # data = pd.read_csv('data/concrete_data.csv')  # Replace with your dataset path
 # target_variable = 'concrete_compressive_strength'  # Replace with your target variable name
 target_variable = ['max_uz']
-x_test, X_pool_filtered, _ = generation_pool_fea(seed=seed)
+x_test, X_pool_filtered, _ = generation_pool_fea(seed=seed, n_pool=10000)
 
 fea_df = pd.read_csv(f'../data/fea_output_{seed}.csv')
 x_test = fea_df.drop(columns=target_variable)
