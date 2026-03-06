@@ -149,7 +149,7 @@ def to_arrays(avg_result: dict, metric: str):
     return x, y, s
 
 
-def plot_metric(metric: str, series_map: dict, out_path: Path):
+def plot_metric(metric: str, series_map: dict, out_path: Path, use_log_scale: bool):
     fig, ax = plt.subplots(1, 1, figsize=(9, 5))
     colors = {
         "GP": "tab:blue",
@@ -163,7 +163,14 @@ def plot_metric(metric: str, series_map: dict, out_path: Path):
         ax.plot(x, y, color=color, marker="o", label=f"{name} mean")
         ax.fill_between(x, y - s, y + s, color=color, alpha=0.2, label=f"{name} std")
 
-    ax.set_title(f"{metric.upper()} vs Iteration")
+    if use_log_scale:
+        if metric == "r2":
+            ax.set_yscale("symlog", linthresh=1e-2)
+        else:
+            ax.set_yscale("log")
+
+    scale_tag = "LOG" if use_log_scale else "LINEAR"
+    ax.set_title(f"{metric.upper()} vs Iteration ({scale_tag})")
     ax.set_xlabel("Iteration")
     ax.set_ylabel(metric.upper())
     ax.grid(alpha=0.3)
@@ -203,9 +210,11 @@ def main():
             "GP": gp_result,
             "AutoML": automl_result,
         }
-        fig_path = out_dir / f"GP_vs_AutoML_vs_{metric}.png"
-        plot_metric(metric, series_map, fig_path)
-        saved.append(fig_path)
+        for use_log_scale in [False, True]:
+            suffix = "linear" if not use_log_scale else "log"
+            fig_path = out_dir / f"GP_vs_AutoML_vs_{metric}_{suffix}.png"
+            plot_metric(metric, series_map, fig_path, use_log_scale=use_log_scale)
+            saved.append(fig_path)
 
     print(f"Saved merged summary: {merged_json}")
     for p in saved:
