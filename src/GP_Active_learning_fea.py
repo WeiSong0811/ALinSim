@@ -108,6 +108,7 @@ for step in range(query_steps+1):
         # 在Parameter_space中随机选择10个样本的索引作为初始训练集
         rng = np.random.default_rng(seed)
         initial_idx_list = rng.choice(Parameter_space.index, size=initial_query_size, replace=False).tolist()
+        print('step == 0', initial_idx_list)
         query_idx_list = initial_idx_list
     else:
         X_pool_scaled = pd.DataFrame(
@@ -118,6 +119,7 @@ for step in range(query_steps+1):
         query_idx_list = GP_active_learner.query(X_unlabeled=X_pool_scaled, n_act=query_size)
 
     query_X_df, query_y_df = dataset_generation(query_idx_list)
+    print(f'{step}:',query_X_df, query_y_df)
 
     Parameter_space = Parameter_space.drop(index=query_idx_list)  # 从Parameter_space中删除已查询的样本
 
@@ -127,7 +129,7 @@ for step in range(query_steps+1):
     else:
         X_train = np.vstack((X_train, query_X_df.values))
         y_train = np.vstack((y_train, query_y_df.values))
-
+    print(f'{step}: X_train und x_test: ',X_train, y_train)
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     x_test_scaled = scaler.transform(x_test)

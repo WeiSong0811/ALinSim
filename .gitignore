@@ -7,7 +7,7 @@ result_multi_pan
 result_single_pan
 .vscode
 __pycache__
-
+result_single_fea
 src/fea/output_fea
 run_trc/predicted_datasets
 run_trc/src/__pycache__
