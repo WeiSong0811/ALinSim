@@ -7,24 +7,23 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score, mean_absolute_error, root_mean_squared_error
 import pandas as pd
-from strategies import GaussianProcessBased
-from utils import generation_pool_fea
+from strategies import GaussianProcessBased, QBC_Paper
+from utils import generation_pool_fea, predict
 from fea import run_fea
 import warnings
 warnings.filterwarnings("ignore")
-
+from xgboost import XGBRegressor
 parser = argparse.ArgumentParser(description="Run GP_AL on a specific dataset.")
 parser.add_argument("--random_state", type=int, required=True, help="Random state for fitting.")
-# parser.add_argument("--label_idx", type=int, default=0, help="Index of the target variable to fit.")
+parser.add_argument("--label_idx", type=int, default=0, help="Index of the target variable to fit.")
 # parser.add_argument("--time-limit", type=int, default=3600, help="Time limit for fitting in seconds.")
 args = parser.parse_args()
-# label_idx = args.label_idx
 seed = args.random_state
 
 # data = pd.read_csv('data/concrete_data.csv')  # Replace with your dataset path
 # target_variable = 'concrete_compressive_strength'  # Replace with your target variable name
 target_variable = ['max_uz']
-x_test, X_pool_filtered, _ = generation_pool_fea(seed=seed, n_pool=100000)
+x_test, X_pool_filtered = generation_pool_fea(seed=seed, n_pool=100000)
 
 fea_df = pd.read_csv(f'../data/fea_output_{seed}.csv')
 x_test = fea_df.drop(columns=target_variable)
@@ -84,14 +83,16 @@ def dataset_generation(idx_list):
 
 d = Parameter_space.shape[1]  # 你的特征维度
 
-kernel_RBF = (
-    C(1.0, (1e-3, 1e3)) *
-    RBF(length_scale=np.ones(d), length_scale_bounds=(1e-2, 1e2))
-    +
-    WhiteKernel(noise_level=1e-3, noise_level_bounds=(1e-8, 1e0))
-)
+# kernel_RBF = (
+#     C(1.0, (1e-3, 1e3)) *
+#     RBF(length_scale=np.ones(d), length_scale_bounds=(1e-2, 1e2))
+#     +
+#     WhiteKernel(noise_level=1e-3, noise_level_bounds=(1e-8, 1e0))
+# )
 
-GP_active_learner = GaussianProcessBased(kernel=kernel_RBF, n_restarts_optimizer=15, random_state=seed)
+# GP_active_learner = GaussianProcessBased(kernel=kernel_RBF, n_restarts_optimizer=15, random_state=seed)
+
+qbc_active_learner = QBC_Paper(random_state=seed)
 
 query_steps = 20
 query_size = 2
@@ -101,6 +102,20 @@ mae_list = []
 rmse_list = []
 r2_list = []
 
+model = XGBRegressor(
+    booster="gbtree",
+    n_estimators=1000,
+    learning_rate=0.1,
+    reg_alpha=0.01,      # L1
+    reg_lambda=0.1,      # L2
+    tree_method="hist",
+    subsample=0.85,
+    colsample_bytree=0.3,
+    colsample_bylevel=0.5,
+    random_state=seed,
+    n_jobs=-1
+)
+
 for step in range(query_steps+1):
     print(f'Query step: {step}')
 
@@ -108,7 +123,6 @@ for step in range(query_steps+1):
         # 在Parameter_space中随机选择10个样本的索引作为初始训练集
         rng = np.random.default_rng(seed)
         initial_idx_list = rng.choice(Parameter_space.index, size=initial_query_size, replace=False).tolist()
-        print('step == 0', initial_idx_list)
         query_idx_list = initial_idx_list
     else:
         X_pool_scaled = pd.DataFrame(
@@ -116,10 +130,9 @@ for step in range(query_steps+1):
             index=Parameter_space.index,
             columns=Parameter_space.columns
         )
-        query_idx_list = GP_active_learner.query(X_unlabeled=X_pool_scaled, n_act=query_size)
+        query_idx_list = qbc_active_learner.query(X_unlabeled=X_pool_scaled, n_act=query_size, X_labeled=X_train, y_labeled=y_train)
 
     query_X_df, query_y_df = dataset_generation(query_idx_list)
-    print(f'{step}:',query_X_df, query_y_df)
 
     Parameter_space = Parameter_space.drop(index=query_idx_list)  # 从Parameter_space中删除已查询的样本
 
@@ -129,13 +142,13 @@ for step in range(query_steps+1):
     else:
         X_train = np.vstack((X_train, query_X_df.values))
         y_train = np.vstack((y_train, query_y_df.values))
-    print(f'{step}: X_train und x_test: ',X_train, y_train)
+
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     x_test_scaled = scaler.transform(x_test)
     
-    GP_active_learner.fit(X_train_scaled, y_train)
-    y_pred = GP_active_learner.predict(x_test_scaled)
+    model.fit(X_train_scaled, y_train)
+    y_pred = model.predict(x_test_scaled)
 
     mae_list.append(mean_absolute_error(y_test, y_pred))
     rmse_list.append(root_mean_squared_error(y_test, y_pred))
@@ -143,12 +156,16 @@ for step in range(query_steps+1):
 
 # 保存结果到json
 import json
+
+
 results = {
     "mae": mae_list,
     "rmse": rmse_list,
     "r2": r2_list
 }
-with open(f'../result_single_fea/GP_AL_results_seed_{seed}.json', 'w') as f:
+
+
+with open(f'../result_single_pan/QBC_AL_PAN_results_seed_{seed}.json', 'w') as f:
     json.dump(results, f)
 
 

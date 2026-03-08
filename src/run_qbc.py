@@ -7,7 +7,7 @@ from pathlib import Path
 def run_one(seed: int, label_idx: int, workdir: Path):
     cmd = [
         sys.executable,
-        "qbc_Active_learning.py",
+        "qbc_Active_learning_fea.py",
         "--random_state",
         str(seed),
         "--label_idx",
@@ -19,7 +19,7 @@ def run_one(seed: int, label_idx: int, workdir: Path):
 
 def main():
     workdir = Path(__file__).resolve().parent
-    tasks = [(seed, label_idx) for seed in range(40, 50) for label_idx in range(3)]
+    tasks = [(seed, label_idx) for seed in range(30, 50) for label_idx in range(3)]
     max_workers = 1
 
     print(f"Start {len(tasks)} tasks with {max_workers} workers...")
