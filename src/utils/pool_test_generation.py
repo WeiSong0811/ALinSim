@@ -470,7 +470,9 @@ def generation_pool_fea(
 
 # X_test_fea, _, _ = generation_pool_fea(seed=42, n_test=100, delta_factor=0.5, verbose=True)
 
-#for seed in [40, 41, 42, 43, 44, 45, 46, 47, 48, 49]:
-#    X_test_fea, X_pool_fea, meta_fea = generation_pool_fea(seed=seed, n_test=150, delta_factor=0.5, verbose=True)
-#    X_test_fea.to_csv(f'../data/fea_test_{seed}.csv', index=False)
-#    print(f"Seed {seed} finished. Test set size: {X_test_fea.shape[0]}, Pool size: {X_pool_fea.shape[0]}")
+'''
+for seed in [30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49]:
+    X_test_fea, X_pool_fea, meta_fea = generation_pool_fea(seed=seed, n_test=150, delta_factor=0.5, verbose=True)
+    X_test_fea.to_csv(f'../data/fea_test_{seed}.csv', index=False)
+    print(f"Seed {seed} finished. Test set size: {X_test_fea.shape[0]}, Pool size: {X_pool_fea.shape[0]}")
+'''
