@@ -10,6 +10,7 @@ import pandas as pd
 from strategies import GaussianProcessBased
 from utils import generation_pool_fea
 from fea import run_fea
+import json
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -94,13 +95,14 @@ kernel_RBF = (
 GP_active_learner = GaussianProcessBased(kernel=kernel_RBF, n_restarts_optimizer=15, random_state=seed)
 
 query_steps = 20
-query_size = 2
+query_size = 5
 initial_query_size = 5
 
 mae_list = []
 rmse_list = []
 r2_list = []
 
+results_fea = []
 for step in range(query_steps+1):
     print(f'Query step: {step}')
 
@@ -133,7 +135,13 @@ for step in range(query_steps+1):
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     x_test_scaled = scaler.transform(x_test)
-    
+    results_fea.append(
+        {
+            'Step': step,
+            'X_train': X_train_scaled.copy().tolist(),
+            'y_train': y_train.copy().tolist()
+        }
+    )
     GP_active_learner.fit(X_train_scaled, y_train)
     y_pred = GP_active_learner.predict(x_test_scaled)
 
@@ -142,17 +150,13 @@ for step in range(query_steps+1):
     r2_list.append(r2_score(y_test, y_pred))
 
 # 保存结果到json
-import json
 results = {
     "mae": mae_list,
     "rmse": rmse_list,
     "r2": r2_list
 }
-with open(f'../result_single_fea/GP_AL_results_seed_{seed}.json', 'w') as f:
+with open(f'../result_single_fea_test/GP_AL_results_seed_{seed}.json', 'w') as f:
     json.dump(results, f)
 
-
-
-
-
-
+with open(f'../result_single_fea_test/GP_AL_results_seed_{seed}_fea.json', 'w') as f:
+    json.dump(results_fea, f)

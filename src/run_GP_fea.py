@@ -17,7 +17,7 @@ def run_one(seed: int, workdir: Path):
 
 def main():
     workdir = Path(__file__).resolve().parent
-    tasks = [seed for seed in range(40, 50)]
+    tasks = [seed for seed in range(30, 50)]
     max_workers = 1
 
     print(f"Start {len(tasks)} tasks with {max_workers} workers...")
