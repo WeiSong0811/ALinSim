@@ -25,7 +25,12 @@ def parse_args():
         default="./AL_metrics_summary.json",
         help="Path to AutoML summary JSON.",
     )
-
+    parser.add_argument(
+        "--qbc-json",
+        type=str,
+        default="./QBC_metrics_summary.json",
+        help="Path to QBC summary JSON for additional comparison.",
+    )
     parser.add_argument(
         "--out-dir",
         type=str,
@@ -184,7 +189,7 @@ def main():
     args = parse_args()
     gp_path = Path(args.gp_json).resolve()
     automl_path = Path(args.automl_json).resolve()
-
+    qbc_path = Path(args.qbc_json).resolve()
     out_dir = Path(args.out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -192,13 +197,16 @@ def main():
         gp_payload = json.load(f)
     with automl_path.open("r", encoding="utf-8") as f:
         automl_payload = json.load(f)
+    with qbc_path.open("r", encoding="utf-8") as f:
+        qbc_payload = json.load(f)
 
     gp_result = load_results(gp_payload)
     automl_result = load_results(automl_payload)
-
+    qbc_result = load_results(qbc_payload)
     merged = {
         "gp": gp_result,
         "automl": automl_result,
+        "qbc": qbc_result,
     }
     merged_json = out_dir / "GP_vs_AutoML_vs_QBC.json"
     with merged_json.open("w", encoding="utf-8") as f:
@@ -209,10 +217,11 @@ def main():
         series_map = {
             "GP": gp_result,
             "AutoML": automl_result,
+            "QBC": qbc_result,
         }
         for use_log_scale in [False, True]:
             suffix = "linear" if not use_log_scale else "log"
-            fig_path = out_dir / f"GP_vs_AutoML_vs_{metric}_{suffix}.png"
+            fig_path = out_dir / f"GP_vs_AutoML_QBC_vs_{metric}_{suffix}.png"
             plot_metric(metric, series_map, fig_path, use_log_scale=use_log_scale)
             saved.append(fig_path)
 

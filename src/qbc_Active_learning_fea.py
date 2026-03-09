@@ -23,7 +23,7 @@ seed = args.random_state
 # data = pd.read_csv('data/concrete_data.csv')  # Replace with your dataset path
 # target_variable = 'concrete_compressive_strength'  # Replace with your target variable name
 target_variable = ['max_uz']
-x_test, X_pool_filtered = generation_pool_fea(seed=seed, n_pool=100000)
+x_test, X_pool_filtered, _ = generation_pool_fea(seed=seed, n_pool=1000)
 
 fea_df = pd.read_csv(f'../data/fea_output_{seed}.csv')
 x_test = fea_df.drop(columns=target_variable)
@@ -78,7 +78,6 @@ def dataset_generation(idx_list):
         # 将查询到的样本添加到查询数据集中,并且要考虑到idx这个绝对索引，不能直接append，要用loc或者iloc来添加
         query_X_df.loc[idx] = Parameter_space.loc[idx]
         query_y_df.loc[idx, target_variable] = y_sim
-
     return query_X_df, query_y_df
 
 d = Parameter_space.shape[1]  # 你的特征维度
@@ -148,6 +147,7 @@ for step in range(query_steps+1):
     x_test_scaled = scaler.transform(x_test)
     
     model.fit(X_train_scaled, y_train)
+    print('in Step:', step, 'X train shape:',X_train_scaled.shape)
     y_pred = model.predict(x_test_scaled)
 
     mae_list.append(mean_absolute_error(y_test, y_pred))
@@ -165,7 +165,7 @@ results = {
 }
 
 
-with open(f'../result_single_pan/QBC_AL_PAN_results_seed_{seed}.json', 'w') as f:
+with open(f'../QBC_AL_PAN_results_seed_{seed}.json', 'w') as f:
     json.dump(results, f)
 
 
