@@ -2,13 +2,15 @@ src_alt
 src/utils/__pycache__
 src/strategies/__pycache__
 src/utils/utils_initialize/__pycache__
-run_trc/workdir
+src/run_trc/workdir
 result_multi_pan
 result_single_pan
 .vscode
 __pycache__
 result_single_fea
 src/fea/output_fea
-run_trc/src/__pycache__
+src/run_trc/src/__pycache__
 result_single_fea_10000
 result_single_fea_10
+src/run_trc/data
+src/workdir
