@@ -5,3 +5,4 @@ from .pool_test_generation import generation_pool_pan, generation_pool_fea, gene
 from .Sim_PAN import func, predict
 #from .active_learner_auto import active_learning as active_learning_auto
 #from .active_learner_auto_single import active_learning as active_learning_auto_single
+from .active_learner_trc import active_learning as active_learning_trc

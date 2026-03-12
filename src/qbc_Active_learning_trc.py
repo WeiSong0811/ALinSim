@@ -68,15 +68,9 @@ def simulator(X_single_row):
 
 def dataset_generation(idx_list):
 
-    query_X_df = pd.DataFrame(columns=Parameter_space.columns)
-    query_y_df = pd.DataFrame(columns=target_variable)
-    
-    for idx in idx_list:
-        X = Parameter_space.loc[idx].values
-        y_sim = predict(X)
-        # 将查询到的样本添加到查询数据集中,并且要考虑到idx这个绝对索引，不能直接append，要用loc或者iloc来添加
-        query_X_df.loc[idx] = Parameter_space.loc[idx]
-        query_y_df.loc[idx, target_variable] = y_sim
+    query_X_df = Parameter_space.loc[idx_list].copy()
+    y_batch = np.asarray(predict(query_X_df.values)).reshape(-1, 1)
+    query_y_df = pd.DataFrame(y_batch, index=idx_list, columns=target_variable)
     return query_X_df, query_y_df
 
 d = Parameter_space.shape[1]  # 你的特征维度
@@ -163,8 +157,7 @@ results = {
     "r2": r2_list
 }
 
-
-with open(f'../QBC_AL_PAN_results_seed_{seed}.json', 'w') as f:
+with open(f'../results/result_single_trc/QBC_AL_PAN_results_seed_{seed}.json', 'w') as f:
     json.dump(results, f)
 
 
