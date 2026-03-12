@@ -4,7 +4,8 @@ import os
 import shutil
 import subprocess
 import sys
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED
+
 from datetime import datetime
 
 import numpy as np
@@ -81,6 +82,93 @@ def run_one_sim(i, row, run_root, sim_trc_dir, run_sim_py, space):
 
     return i, row_list, y_i, errors
 
+def predict_with_retry(
+    X_candidates,
+    idx_candidates,
+    target_valid=5,
+    init_parallel=5,
+    seed=42,
+):
+    """
+    X_candidates: shape (N, 6), 建议 N=15
+    idx_candidates: 长度N，对应每个样本的原始idx
+    返回:
+      valid_y: 长度=target_valid(若候选不足可能小于)
+      consumed_idx: 实际调用过tool的idx（成功+失败）
+      valid_idx: 有效y对应的idx
+    """
+    X_arr = np.asarray(X_candidates)
+    if X_arr.ndim != 2 or X_arr.shape[1] != 6:
+        raise ValueError(f"X_candidates must be (N, 6), got {X_arr.shape}.")
+    if len(idx_candidates) != len(X_arr):
+        raise ValueError("idx_candidates length must match X_candidates rows.")
+
+    space = [
+        {"name": "x_0", "domain": (1, 9), "type": "integer"},
+        {"name": "x_1", "domain": (1, 9), "type": "integer"},
+        {"name": "x_2", "domain": (1, 9), "type": "integer"},
+        {"name": "y_0", "domain": (0, 3), "type": "integer"},
+        {"name": "y_1", "domain": (1, 3), "type": "integer"},
+        {"name": "y_2", "domain": (0, 3), "type": "integer"},
+    ]
+    use_case = "SIM-TRC"
+    sim_trc_dir = os.path.join("./run_trc/src")
+    run_sim_py = "run_sim_trc.py"
+    ensure_compat_exe_dir(sim_trc_dir)
+
+    run_tag = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_root = os.path.join("workdir", "sim_trc_runs", f"{use_case}_{seed}_{run_tag}")
+    os.makedirs(run_root, exist_ok=True)
+
+    valid_y = []
+    valid_idx = []
+    consumed_idx = []
+
+    next_pos = 0
+    sim_counter = 0
+    future_to_meta = {}  # future -> (cand_pos, original_idx)
+
+    def submit_one(executor, cand_pos):
+        nonlocal sim_counter
+        fut = executor.submit(
+            run_one_sim,
+            sim_counter,                 # 用独立sim id创建sim目录
+            X_arr[cand_pos],
+            run_root,
+            sim_trc_dir,
+            run_sim_py,
+            space,
+        )
+        future_to_meta[fut] = (cand_pos, idx_candidates[cand_pos])
+        sim_counter += 1
+
+    max_workers = max(1, min(init_parallel, os.cpu_count() or 1, len(X_arr)))
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # 初始先跑满5个（或候选不足5个）
+        for _ in range(min(init_parallel, len(X_arr))):
+            submit_one(executor, next_pos)
+            next_pos += 1
+
+        # 任意一个返回就判断一次；失败立刻补1个
+        while future_to_meta and len(valid_y) < target_valid:
+            done, _ = wait(list(future_to_meta.keys()), return_when=FIRST_COMPLETED)
+
+            for fut in done:
+                _, idx = future_to_meta.pop(fut)
+                _, _, y_i, _ = fut.result()
+                consumed_idx.append(idx)
+
+                if y_i != 0.0:
+                    valid_y.append(float(y_i))
+                    valid_idx.append(idx)
+                    if len(valid_y) >= target_valid:
+                        break
+                else:
+                    if next_pos < len(X_arr):
+                        submit_one(executor, next_pos)
+                        next_pos += 1
+
+    return valid_y, consumed_idx, valid_idx
 
 def predict(X, seed=42):
     X_arr = np.asarray(X)

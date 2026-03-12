@@ -1,1 +1,1 @@
-from .tool_trc import predict
+from .tool_trc import predict, predict_with_retry

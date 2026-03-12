@@ -5,7 +5,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 import json
 from utils import active_learning_trc, generation_pool_trc
-from run_trc import predict
+from run_trc import predict_with_retry
 from strategies import TreeBasedRegressor_Representativity_self
 import warnings
 # from config_loader import load_config, create_kernel
@@ -93,13 +93,13 @@ def main():
     
     # print('*' * 15, f'Processing {key} dataset')
 
-    target_variable = ['f_res']
+    # target_variable = ['f_res']
     X_t = X_pool_filtered
-    fea_df = pd.read_csv(f'./run_trc/predicted_datasets/sim_trc_{random_state}.csv')
-    X_test = fea_df.drop(columns=target_variable)
-    y_val = fea_df[target_variable]
-    X_val = X_test.copy()
-    y_val = pd.DataFrame(y_val, columns=target_variable)
+    # fea_df = pd.read_csv(f'./run_trc/predicted_datasets/sim_trc_{random_state}.csv')
+    # X_test = fea_df.drop(columns=target_variable)
+    # y_val = fea_df[target_variable]
+    # X_val = X_test.copy()
+    # y_val = pd.DataFrame(y_val, columns=target_variable)
     # y_val_out = pd.concat([X_test.reset_index(drop=True), y_val], axis=1)
     # y_val_out.to_csv(f'../data/pan_test.csv', index=False)
     # X_t, X_val, y_t, y_val = value
@@ -116,8 +116,8 @@ def main():
     result_filename = f"/{estimators[strategy_num_int].__class__.__name__}"
     print(f"Result filename: {result_filename}")
     
-    query_idx_all, query_time_all = active_learning_trc(estimators_list, X_t, X_val, y_val, n_initial,
-                                                                       n_pro_query, n_queries, threshold,
+    query_idx_all, query_time_all = active_learning_trc(estimators_list, X_t, n_initial,
+                                                                       n_pro_query, n_queries,
                                                                        random_state=random_state)
     
     result = query_idx_all.copy()

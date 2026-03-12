@@ -18,7 +18,7 @@ from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 from tqdm import tqdm
 from .initialize import initialize
 import time
-from run_trc import predict
+from run_trc import predict_with_retry
 
 class RandomSearch:
     """
@@ -75,8 +75,8 @@ def data_extraction(idx, X):
     return extracted_data, remaining_data
 
 
-def active_learning(estimators, X_t, X_val, y_val, n_initial, n_pro_query, n_queries, threshold,
-                    initial_method="random", random_state=36, record_metrics=False):
+def active_learning(estimators, X_t, n_initial, n_pro_query, n_queries,
+                    initial_method="random", random_state=36):
     """
     Main active learning loop for conducting experiments.
 
@@ -105,83 +105,87 @@ def active_learning(estimators, X_t, X_val, y_val, n_initial, n_pro_query, n_que
             - query_idx_all: Dictionary containing query indices for each strategy
             - query_time_all: Dictionary containing timing information
     """
+    n_candidates = 3 * n_pro_query
     random_strategy = RandomSearch(random_state=random_state)
 
     query_idx_all = {}
     query_time_all = {}
-    metrics_all = {}
-
-    def eval_metrics(X_labeled, y_labeled):
-        # Simple baseline model for per-round evaluation
-        model = RandomForestRegressor(n_estimators=200, random_state=random_state)
-        model.fit(X_labeled, y_labeled)
-        y_pred = model.predict(X_val)
-        r2 = r2_score(y_val, y_pred, multioutput='variance_weighted')
-        mae = mean_absolute_error(y_val, y_pred)
-        rmse = float(np.sqrt(mean_squared_error(y_val, y_pred)))
-        return {"r2": float(r2), "mae": float(mae), "rmse": float(rmse)}
 
     for estimator in estimators:
         idx_batch = []
         query_time = []
         X_unlabeled = X_t.copy() # 参数空间
 
-        initial_idx = initialize(X_unlabeled, n_initial, method=initial_method)
+        initial_idx = initialize(X_unlabeled, 3 * n_initial, method=initial_method)
 
-        idx_batch.append(initial_idx)
-        X_labeled, X_unlabeled = data_extraction(initial_idx, X_unlabeled)
-        X_labeled_np = X_labeled.to_numpy(dtype=float)
+        # X_init, X_unlabeled = data_extraction(initial_idx, X_unlabeled)
 
-        y_vals = predict(X_labeled_np)
+        X_init = X_unlabeled.loc[initial_idx].copy()
 
-        y_labeled = pd.DataFrame({"f_res": y_vals}, index=X_labeled.index)
-        # y_labeled, y_unlabeled = data_extraction(initial_idx, y_unlabeled)
+        valid_y, consumed_idx, valid_idx = predict_with_retry(
+            X_candidates=X_init.to_numpy(dtype=float),
+            idx_candidates=X_init.index.tolist(),
+            target_valid=n_pro_query,
+            init_parallel=5,
+            seed=random_state
+        )
 
-        metrics = []
-        if record_metrics:
-            metrics.append(eval_metrics(X_labeled, y_labeled))
+        idx_batch.append(consumed_idx)
+
+        X_labeled = X_t.loc[valid_idx].copy()
+        y_labeled = pd.DataFrame({'f_res': valid_y}, index=valid_idx)
+
+        X_unlabeled = X_unlabeled.drop(index=consumed_idx, errors='ignore')
+
 
         for _ in tqdm(range(n_queries), desc=f'{estimator.__class__.__name__} Querying', unit='query'):
             start = time.perf_counter()
+            n_act = min(n_candidates, len(X_unlabeled))
+
+            if n_act  <= 0:
+                break
+
             try:
-                query_idx = estimator.query(X_unlabeled=X_unlabeled, n_act=n_pro_query, X_labeled=X_labeled,
+                query_idx = estimator.query(X_unlabeled=X_unlabeled, n_act=n_act, X_labeled=X_labeled,
                                             y_labeled=y_labeled)
             except Exception as e:
-                query_idx = random_strategy.query(X_unlabeled=X_unlabeled, n_act=n_pro_query, X_labeled=X_labeled,
+                query_idx = random_strategy.query(X_unlabeled=X_unlabeled, n_act=n_act, X_labeled=X_labeled,
                                             y_labeled=y_labeled)
                 
             end = time.perf_counter()
             query_time.append(end - start)
 
-            idx_batch.append(query_idx)
-            X_query, X_unlabeled = data_extraction(query_idx, X_unlabeled)
-            # y_query, y_unlabeled = data_extraction(query_idx, y_unlabeled)
-            X_labeled = pd.concat([X_labeled, X_query])
-            y_vals_query = []
-            for row in X_query.to_numpy(dtype=float):
-                y = run_fea(row)
-                y_vals_query.append(float(y))
-            y_query = pd.DataFrame({"f_res": y_vals_query}, index=X_query.index)
-            y_labeled = pd.concat([y_labeled, y_query])
-            if record_metrics:
-                metrics.append(eval_metrics(X_labeled, y_labeled))
+            X_candidates = X_unlabeled.loc[query_idx]
 
-        if estimator.__class__.__name__ == "BMDAL":
-            query_idx_all[estimator.__class__.__name__ + '_' + estimator.selection_method] = idx_batch
-            query_time_all[estimator.__class__.__name__ + '_' + estimator.selection_method] = query_time
-            if record_metrics:
-                metrics_all[estimator.__class__.__name__ + '_' + estimator.selection_method] = metrics
-        else:
-            query_idx_all[estimator.__class__.__name__] = idx_batch
-            query_time_all[estimator.__class__.__name__] = query_time
-            if record_metrics:
-                metrics_all[estimator.__class__.__name__] = metrics
+            valid_y, consumed_idx, valid_idx = predict_with_retry(
+                X_candidates=X_candidates.to_numpy(dtype=float),
+                idx_candidates=X_candidates.index.tolist(),
+                target_valid=n_pro_query,  # 目标有效样本数=5
+                init_parallel=5,           # 初始并行=5
+                seed=random_state,
+            )
 
-    if record_metrics:
-        return query_idx_all, query_time_all, metrics_all
+            # 建议记录有效idx；如果想追踪失败可改成记录dict
+            idx_batch.append(consumed_idx)
+
+            if len(valid_idx) > 0:
+                X_query = X_t.loc[valid_idx].copy()
+                y_query = pd.DataFrame({"f_res": valid_y}, index=valid_idx)
+                X_labeled = pd.concat([X_labeled, X_query], axis=0)
+                y_labeled = pd.concat([y_labeled, y_query], axis=0)
+
+            # 只移除真正试用过的样本（成功+失败）
+            X_unlabeled = X_unlabeled.drop(index=consumed_idx, errors="ignore")
+
+        key = estimator.__class__.__name__
+
+        if key == "BMDAL":
+            key = key + "_" + estimator.selection_method
+
+        query_idx_all[key] = idx_batch
+        query_time_all[key] = query_time
 
     return query_idx_all, query_time_all
-
 
 def suggest_next_batch(estimator, X_labeled, y_labeled, X_unlabeled, n_pro_query, random_state=36):
     """
