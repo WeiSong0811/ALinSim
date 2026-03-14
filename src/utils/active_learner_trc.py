@@ -11,6 +11,7 @@ License: MIT License
 Created: 2025-01-06
 """
 
+import os
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
@@ -75,8 +76,20 @@ def data_extraction(idx, X):
     return extracted_data, remaining_data
 
 
+def _save_labeled_snapshot(save_dir, estimator_name, round_id, X_labeled, y_labeled):
+    """Save cumulative labeled X/y snapshots for one round."""
+    if save_dir is None:
+        return
+
+    estimator_dir = os.path.join(save_dir, estimator_name)
+    os.makedirs(estimator_dir, exist_ok=True)
+
+    X_labeled.to_csv(os.path.join(estimator_dir, f"round_{round_id:02d}_X.csv"), index=True)
+    y_labeled.to_csv(os.path.join(estimator_dir, f"round_{round_id:02d}_y.csv"), index=True)
+
+
 def active_learning(estimators, X_t, n_initial, n_pro_query, n_queries,
-                    initial_method="random", random_state=36):
+                    initial_method="random", random_state=36, save_dir=None):
     """
     Main active learning loop for conducting experiments.
 
@@ -99,6 +112,8 @@ def active_learning(estimators, X_t, n_initial, n_pro_query, n_queries,
             Defaults to ["normal"].
         random_state (int, optional): Random seed for reproducibility.
             Defaults to 36.
+        save_dir (str, optional): Directory for saving per-round labeled X/y.
+            Saves round 0 after initialization, then after each query round.
 
     Returns:
         tuple: (query_idx_all, query_time_all) where:
@@ -114,6 +129,10 @@ def active_learning(estimators, X_t, n_initial, n_pro_query, n_queries,
     for estimator in estimators:
         idx_batch = []
         query_time = []
+        key = estimator.__class__.__name__
+
+        if key == "BMDAL":
+            key = key + "_" + estimator.selection_method
         X_unlabeled = X_t.copy() # 参数空间
 
         initial_idx = initialize(X_unlabeled, 3 * n_initial, method=initial_method)
@@ -137,8 +156,15 @@ def active_learning(estimators, X_t, n_initial, n_pro_query, n_queries,
 
         X_unlabeled = X_unlabeled.drop(index=consumed_idx, errors='ignore')
 
+        _save_labeled_snapshot(
+            save_dir=save_dir,
+            estimator_name=key,
+            round_id=0,
+            X_labeled=X_labeled,
+            y_labeled=y_labeled,
+        )
 
-        for _ in tqdm(range(n_queries), desc=f'{estimator.__class__.__name__} Querying', unit='query'):
+        for round_id in tqdm(range(1, n_queries + 1), desc=f'{estimator.__class__.__name__} Querying', unit='query'):
             start = time.perf_counter()
             n_act = min(n_candidates, len(X_unlabeled))
 
@@ -174,13 +200,16 @@ def active_learning(estimators, X_t, n_initial, n_pro_query, n_queries,
                 X_labeled = pd.concat([X_labeled, X_query], axis=0)
                 y_labeled = pd.concat([y_labeled, y_query], axis=0)
 
+            _save_labeled_snapshot(
+                save_dir=save_dir,
+                estimator_name=key,
+                round_id=round_id,
+                X_labeled=X_labeled,
+                y_labeled=y_labeled,
+            )
+
             # 只移除真正试用过的样本（成功+失败）
             X_unlabeled = X_unlabeled.drop(index=consumed_idx, errors="ignore")
-
-        key = estimator.__class__.__name__
-
-        if key == "BMDAL":
-            key = key + "_" + estimator.selection_method
 
         query_idx_all[key] = idx_batch
         query_time_all[key] = query_time

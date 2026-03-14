@@ -74,14 +74,18 @@ def main():
     result_path = os.path.join(result_path, str(random_state))
     
     result_time_record_path = os.path.join(result_path, 'time_record')
+    result_xy_record_path = os.path.join(result_path, 'xy_record', current_time)
     if not os.path.exists(result_time_record_path):
         os.makedirs(result_time_record_path, exist_ok=True)
     
     if not os.path.exists(result_path):
         os.makedirs(result_path, exist_ok=True)
+    if not os.path.exists(result_xy_record_path):
+        os.makedirs(result_xy_record_path, exist_ok=True)
         
     print(f'result_path: {result_path}')
     print(f'result_time_record_path: {result_time_record_path}')
+    print(f'result_xy_record_path: {result_xy_record_path}')
     
     results = {}
     
@@ -118,7 +122,8 @@ def main():
     
     query_idx_all, query_time_all = active_learning_trc(estimators_list, X_t, n_initial,
                                                                        n_pro_query, n_queries,
-                                                                       random_state=random_state)
+                                                                       random_state=random_state,
+                                                                       save_dir=result_xy_record_path)
     
     result = query_idx_all.copy()
     result['random_state'] = random_state
