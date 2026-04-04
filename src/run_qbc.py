@@ -10,21 +10,18 @@ def run_one(seed: int, label_idx: int, workdir: Path):
         "qbc_Active_learning_fea.py",
         "--random_state",
         str(seed),
-        "--label_idx",
-        str(label_idx),
     ]
     proc = subprocess.run(cmd, cwd=str(workdir), capture_output=True, text=True)
     return seed, label_idx, proc.returncode, proc.stderr[-300:]
 
-
 def main():
     workdir = Path(__file__).resolve().parent
-    tasks = [(seed, label_idx) for seed in range(30, 50) for label_idx in range(3)]
-    max_workers = 1
+    tasks = [seed for seed in range(30, 40)]
+    max_workers = 10
 
     print(f"Start {len(tasks)} tasks with {max_workers} workers...")
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [executor.submit(run_one, seed, label_idx, workdir) for seed, label_idx in tasks]
+        futures = [executor.submit(run_one, seed, 0, workdir) for seed in tasks]
         for future in as_completed(futures):
             seed, label_idx, rc, err_tail = future.result()
             if rc == 0:
