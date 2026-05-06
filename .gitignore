@@ -9,7 +9,8 @@ src/fea/output_fea
 src/run_trc/src/__pycache__
 src/run_trc/data
 src/workdir
-results
+results/.result_multi_pan
+results/.result_single_fea_test
 result_plot/.fea
 result_plot/.fea_10
 result_plot/.fea_100000
